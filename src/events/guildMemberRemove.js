@@ -1,11 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 
-/**
- * on guildMemberRemove: posts a SIGNAL LOST message to the leave log.
- */
 module.exports = {
   name: 'guildMemberRemove',
+  /** Post the SIGNAL LOST leave message to the leave log. */
   async execute(client, member) {
     const ch = member.guild.channels.cache.get(config.channels.leaveLog);
     if (!ch) return;

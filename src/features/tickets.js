@@ -3,8 +3,8 @@ const config = require('../config');
 const counters = new Map();
 
 /**
- * Ticket feature: modal-driven ticket channels. Open creates a private
- * channel visible to the member and staff; close deletes it after a delay.
+ * Handle all ticket interactions: open modal, create private channel, close.
+ * @param {import('discord.js').Interaction} interaction - button or modal interaction with a ticket_* customId
  */
 async function handleTicket(interaction) {
   if (interaction.isButton() && interaction.customId === 'ticket_open') {
@@ -32,9 +32,10 @@ async function handleTicket(interaction) {
     const embed = new EmbedBuilder().setColor(config.colors.primary)
       .setTitle(`Ticket #${n}`).setDescription(`Opened by ${interaction.user}\n**Issue:** ${reason}`).setTimestamp();
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket_close').setLabel('Close ticket').setEmoji('\u{1F512}').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId('ticket_close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
     );
-    await ch.send({ content: `<@${interaction.user.id}>`, embeds: [embed], components: [row] });
+    const mention = config.roles.staff ? `<@${interaction.user.id}> <@&${config.roles.staff}>` : `<@${interaction.user.id}>`;
+    await ch.send({ content: mention, embeds: [embed], components: [row] });
     return interaction.reply({ content: `Ticket opened: <#${ch.id}>`, ephemeral: true });
   }
   if (interaction.isButton() && interaction.customId === 'ticket_close') {

@@ -1,13 +1,9 @@
 const { verifyClaim, verifyPanel } = require('../features/verify');
 const { handleTicket } = require('../features/tickets');
 
-/**
- * on interactionCreate: routes slash commands to their modules and button/modal
- * interactions to the verify and ticket features. Errors are caught and
- * reported to the user without crashing the bot.
- */
 module.exports = {
   name: 'interactionCreate',
+  /** Route slash commands, buttons and modals to their handlers. */
   async execute(client, interaction) {
     try {
       if (interaction.isChatInputCommand()) {

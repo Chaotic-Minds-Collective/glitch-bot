@@ -4,7 +4,7 @@
 
 ## Features
 - Custom join ("SIGNAL ACQUIRED") and leave ("SIGNAL LOST") messages
-- One-tap verification button in #verify (grants Member role)
+- One-tap verification button (grants Member role)
 - Welcome DM to every new member
 - Support tickets (private channels, close button)
 - Moderation: /warn /timeout /kick /ban /purge with mod-log
@@ -18,5 +18,5 @@
 4. `npm start`
 
 ## Rules of this repo
-- Never commit `.env` or the bot token.
+- Never commit .env or the bot token.
 - Bot permissions are least-privilege; no Administrator.

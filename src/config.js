@@ -1,9 +1,4 @@
 require('dotenv').config();
-
-/**
- * Central configuration for Glitch, loaded from environment variables.
- * Secrets never live in code; channel/role IDs are wired via .env.
- */
 module.exports = {
   token: process.env.DISCORD_TOKEN,
   guildId: process.env.GUILD_ID,

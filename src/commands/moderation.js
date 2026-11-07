@@ -2,7 +2,8 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('disc
 const config = require('../config');
 
 /**
- * Sends an embed to the configured mod-log channel.
+ * Send a moderation embed to the configured mod-log channel.
+ * Silently does nothing when no mod-log channel is configured.
  */
 async function modLog(guild, embed) {
   if (!config.channels.modLog) return;
@@ -10,11 +11,6 @@ async function modLog(guild, embed) {
   if (ch) ch.send({ embeds: [embed] });
 }
 
-/**
- * Moderation commands: warn, timeout, kick, ban, purge. Every action is
- * logged to the mod-log channel. Each command is gated to the least
- * privilege that can perform it.
- */
 module.exports = [
   {
     data: new SlashCommandBuilder()
@@ -23,6 +19,7 @@ module.exports = [
       .addUserOption((o) => o.setName('member').setDescription('Member to warn').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    /** Handle /warn: DM the member and log the warning. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
       const reason = interaction.options.getString('reason');
@@ -41,6 +38,7 @@ module.exports = [
       .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
       .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    /** Handle /timeout: apply a native Discord timeout and log it. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
       const minutes = interaction.options.getInteger('minutes');
@@ -59,6 +57,7 @@ module.exports = [
       .addUserOption((o) => o.setName('member').setDescription('Member').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
       .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+    /** Handle /kick: remove the member from the guild and log it. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
       const reason = interaction.options.getString('reason');
@@ -76,6 +75,7 @@ module.exports = [
       .addUserOption((o) => o.setName('member').setDescription('Member').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
       .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+    /** Handle /ban: ban the member from the guild and log it. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
       const reason = interaction.options.getString('reason');
@@ -92,6 +92,7 @@ module.exports = [
       .setDescription('Bulk delete messages in this channel')
       .addIntegerOption((o) => o.setName('count').setDescription('1-100').setRequired(true))
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    /** Handle /purge: bulk-delete recent messages in the current channel. */
     async execute(client, interaction) {
       const count = Math.min(Math.max(interaction.options.getInteger('count'), 1), 100);
       const deleted = await interaction.channel.bulkDelete(count, true);

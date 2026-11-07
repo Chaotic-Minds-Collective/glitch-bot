@@ -1,10 +1,6 @@
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const config = require('./config');
 
-/**
- * Glitch bot client entrypoint: registers intents, loads commands and events,
- * starts the game server status monitor, and logs in.
- */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -33,6 +29,7 @@ client.on('interactionCreate', (i) => events.interactionCreate.execute(client, i
 client.on('guildMemberAdd', (m) => events.guildMemberAdd.execute(client, m));
 client.on('guildMemberRemove', (m) => events.guildMemberRemove.execute(client, m));
 
+// Status monitor: check game servers every 2 minutes
 const { monitorLoop } = require('./features/statusMonitor');
 client.once('ready', () => monitorLoop(client));
 

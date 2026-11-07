@@ -2,20 +2,18 @@ const { EmbedBuilder } = require('discord.js');
 const { queryServer } = require('./serverQuery');
 const config = require('../config');
 
-/**
- * Status monitor: queries every configured game server every 2 minutes and
- * posts an update in #server-status only when something changes.
- */
+// Every 2 minutes: query each game server; post an update in #server-status only on change.
 const state = new Map();
 
 /**
- * Runs one status check and posts to the status channel on change.
+ * Poll all configured game servers and post a status embed on any change.
+ * @param {import('discord.js').Client} client - logged-in Discord client
  */
 async function check(client) {
   if (!config.channels.serverStatus || !config.gameServers.length) return;
   const results = await Promise.all(config.gameServers.map(queryServer));
   const key = results.map((r) => `${r.name}:${r.online ? r.players : 'x'}`).join('|');
-  if (state.has(key)) return;
+  if (state.has(key)) return; // no change
   state.clear(); state.set(key, true);
   const ch = client.channels.cache.get(config.channels.serverStatus);
   if (!ch) return;
@@ -28,7 +26,8 @@ async function check(client) {
 }
 
 /**
- * Starts the monitor loop after the client is ready.
+ * Start the recurring status monitor loop (first check + every 2 minutes).
+ * @param {import('discord.js').Client} client - logged-in Discord client
  */
 async function monitorLoop(client) {
   await check(client);

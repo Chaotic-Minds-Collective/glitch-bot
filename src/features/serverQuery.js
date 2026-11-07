@@ -1,9 +1,10 @@
 const { GameDig } = require('gamedig');
 
 /**
- * Queries one game server via gamedig. type uses gamedig game ids:
- * 7 Days to Die -> '7d2d', ARK Evolved -> 'ark', ARK Ascended -> 'arkSA', ATLAS -> 'atlas'.
- * Returns an online flag plus player/map info, or offline on failure.
+ * Query a game server. type uses gamedig's game ids:
+ * 7days -> '7d2d', ARK Evolved -> 'ark', ARK Ascended -> 'arkSA', ATLAS -> 'atlas'
+ * @param {{name: string, type: string, host: string, port: number}} cfg - server connection config
+ * @returns {Promise<object>} server status with online flag, player count and map when online
  */
 async function queryServer(cfg) {
   try {
