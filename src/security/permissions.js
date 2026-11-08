@@ -8,12 +8,18 @@ function isOwner(userId) {
 function hasStaffAccess(interaction) {
   if (!interaction?.user || !interaction?.member) return false;
   if (isOwner(interaction.user.id)) return true;
-  const permissions = interaction.member.permissions;
-  if (permissions?.has(PermissionFlagsBits.Administrator)) return true;
-  const roles = interaction.member.roles?.cache;
+
+  const cachedMember = interaction.member?.roles?.cache
+    ? interaction.member
+    : interaction.guild?.members?.cache?.get(interaction.user.id);
+  const permissions = cachedMember?.permissions;
+  if (permissions?.has?.(PermissionFlagsBits.Administrator)) return true;
+
+  const roleCache = cachedMember?.roles?.cache;
+  const rawRoleIds = Array.isArray(interaction.member?.roles) ? interaction.member.roles : [];
   return [config.roles.staff, config.roles.moderator]
     .filter(Boolean)
-    .some((roleId) => roles?.has(roleId));
+    .some((roleId) => roleCache?.has(roleId) || rawRoleIds.includes(roleId));
 }
 
 async function replyEphemeral(interaction, content) {
