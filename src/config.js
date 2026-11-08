@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+/**
+ * Parse and validate the configured game-server entries.
+ * @returns {Array<{name: string, type: string, host: string, port: string | number}>} Validated server entries.
+ * @throws {Error} If GAME_SERVERS is invalid JSON, is not an array, or contains an invalid entry.
+ */
 function loadGameServers() {
   const raw = process.env.GAME_SERVERS || '[]';
   let parsed;
