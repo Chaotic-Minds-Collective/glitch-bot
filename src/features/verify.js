@@ -2,6 +2,13 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFl
 const config = require('../config');
 const { requireStaff, replyEphemeral } = require('../security/permissions');
 
+/**
+ * Grant the configured member role only after the guild member accepts the rules.
+ * Validate both roles and bot permissions, acknowledge existing verification,
+ * and direct successful members to game selection through a private reply.
+ * @param {import('discord.js').ButtonInteraction} interaction Verification button.
+ * @returns {Promise<unknown>} Completion of the private verification response.
+ */
 async function verifyClaim(interaction) {
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'Verification is only available inside the Chaotic Gaming server.');
 
@@ -36,6 +43,12 @@ async function verifyClaim(interaction) {
   return replyEphemeral(interaction, `**VERIFIED.** Welcome to the Collective. Choose your games in <#${config.channels.pickYourWorld}>.`);
 }
 
+/**
+ * Let authorized staff post the verification button in its configured text channel.
+ * Reply privately if the guild or verification channel cannot be used.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Panel command.
+ * @returns {Promise<unknown>} Completion of the private command response.
+ */
 async function verifyPanel(interaction) {
   if (!await requireStaff(interaction, 'post the verification panel')) return;
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'The verification panel can only be posted inside the server.');

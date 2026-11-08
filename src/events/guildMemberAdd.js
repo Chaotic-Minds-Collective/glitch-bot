@@ -3,6 +3,14 @@ const config = require('../config');
 
 module.exports = {
   name: 'guildMemberAdd',
+  /**
+   * Send onboarding steps to the welcome channel and member, and log the join.
+   * Use channel-name fallbacks for missing onboarding IDs; log channel-send
+   * failures and tolerate members who cannot receive direct messages.
+   * @param {import('discord.js').Client} client Client supplied by the event loader.
+   * @param {import('discord.js').GuildMember} member Newly joined guild member.
+   * @returns {Promise<void>} Completion of welcome, join-log, and DM attempts.
+   */
   async execute(client, member) {
     const rulesStep = config.channels.rules ? `<#${config.channels.rules}>` : '#rules';
     const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : '#verify';

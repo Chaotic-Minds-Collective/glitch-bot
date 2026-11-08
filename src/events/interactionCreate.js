@@ -6,6 +6,13 @@ const { handleTicket } = require('../features/tickets');
 
 module.exports = {
   name: 'interactionCreate',
+  /**
+   * Route commands, onboarding components, and ticket buttons/modals to handlers.
+   * Log handler failures and attempt a private reply or follow-up when supported.
+   * @param {import('discord.js').Client} client Client with registered commands.
+   * @param {import('discord.js').Interaction} interaction Incoming Discord interaction.
+   * @returns {Promise<unknown>} Handler result or completion of error handling.
+   */
   async execute(client, interaction) {
     try {
       if (interaction.isChatInputCommand()) {

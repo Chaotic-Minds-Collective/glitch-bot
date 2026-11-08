@@ -7,10 +7,20 @@ const {
 const config = require('../config');
 const { requireStaff, replyEphemeral } = require('../security/permissions');
 
+/**
+ * Return game options that have a configured Discord role ID.
+ * @returns {Array<{value: string, label: string, roleId: string}>} Available games.
+ */
 function configuredGames() {
   return config.gameRoles.filter((game) => game.roleId);
 }
 
+/**
+ * Let authorized staff post the game selector in the configured text channel.
+ * Reply privately if configuration or channel validation fails.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Panel command.
+ * @returns {Promise<unknown>} Completion of the private command response.
+ */
 async function gamePanel(interaction) {
   if (!await requireStaff(interaction, 'post the game selection panel')) return;
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'The game panel can only be posted inside the server.');
@@ -48,6 +58,13 @@ async function gamePanel(interaction) {
   return replyEphemeral(interaction, `Game selection panel posted in <#${channel.id}>.`);
 }
 
+/**
+ * Update only configured game roles for a verified guild member.
+ * Reject unknown selections, mixed clear/game choices, and unassignable roles
+ * before adding or removing roles; then reply with the resulting selection.
+ * @param {import('discord.js').StringSelectMenuInteraction} interaction Game choices.
+ * @returns {Promise<unknown>} Completion of the private selection response.
+ */
 async function selectGames(interaction) {
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'Game selection is only available inside Chaotic Gaming.');
 

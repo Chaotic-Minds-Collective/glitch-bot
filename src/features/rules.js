@@ -8,12 +8,25 @@ const {
 const config = require('../config');
 const { requireStaff, replyEphemeral } = require('../security/permissions');
 
+/**
+ * Check Manage Roles permission and the bot's position above the target role.
+ * @param {import('discord.js').Guild} guild Guild containing the bot and role.
+ * @param {import('discord.js').Role} role Target role to compare with the bot.
+ * @returns {Promise<boolean>} Whether the permission and hierarchy checks pass.
+ */
 async function canAssignRole(guild, role) {
   const botMember = guild.members.me || await guild.members.fetchMe();
   return botMember.permissions.has(PermissionFlagsBits.ManageRoles) &&
     botMember.roles.highest.comparePositionTo(role) > 0;
 }
 
+/**
+ * Record a guild member's acceptance using the configured Rules Accepted role.
+ * Validate configuration and bot permissions before assigning it, acknowledge
+ * existing acceptance, and direct the member to verification in a private reply.
+ * @param {import('discord.js').ButtonInteraction} interaction Acceptance button.
+ * @returns {Promise<unknown>} Completion of the private acceptance response.
+ */
 async function acceptRules(interaction) {
   if (!interaction.inGuild()) {
     return replyEphemeral(interaction, 'Rules acceptance is only available inside Chaotic Gaming.');
@@ -40,6 +53,12 @@ async function acceptRules(interaction) {
   return replyEphemeral(interaction, `Rules accepted. Your next step is verification in <#${config.channels.verify}>.`);
 }
 
+/**
+ * Let authorized staff post the acceptance button in the configured rules channel.
+ * Reply privately when guild or text-channel configuration is unavailable.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Panel command.
+ * @returns {Promise<unknown>} Completion of the private command response.
+ */
 async function rulesPanel(interaction) {
   if (!await requireStaff(interaction, 'post the rules acceptance panel')) return;
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'The rules panel can only be posted inside the server.');
