@@ -142,18 +142,25 @@ async function applyGameSelection(interaction) {
   }
 
   const selectedRoleIds = new Set(selectedGames.map((game) => game.roleId));
-  const desiredRoleIds = new Set(member.roles.cache.keys());
-  for (const { role } of targetRoles) {
-    if (selectedRoleIds.has(role.id)) desiredRoleIds.add(role.id);
-    else desiredRoleIds.delete(role.id);
-  }
-
+  const additions = targetRoles.filter(({ role }) => selectedRoleIds.has(role.id) && !member.roles.cache.has(role.id));
+  const removals = targetRoles.filter(({ role }) => !selectedRoleIds.has(role.id) && member.roles.cache.has(role.id));
+  const reason = 'Member updated game selections in the Glitch Bot game picker.';
   let writeFailed = false;
-  try {
-    await member.roles.set([...desiredRoleIds], 'Member updated game selections in the Glitch Bot game picker.');
-  } catch (error) {
-    writeFailed = true;
-    console.error('[Game Roles] Role update failed:', error);
+  for (const { role } of additions) {
+    try {
+      await member.roles.add(role.id, reason);
+    } catch (error) {
+      writeFailed = true;
+      console.error('[Game Roles] Role addition failed:', error);
+    }
+  }
+  for (const { role } of removals) {
+    try {
+      await member.roles.remove(role.id, reason);
+    } catch (error) {
+      writeFailed = true;
+      console.error('[Game Roles] Role removal failed:', error);
+    }
   }
 
   const current = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);

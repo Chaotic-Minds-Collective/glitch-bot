@@ -63,7 +63,7 @@ async function verifyPanel(interaction) {
     .setDescription('Read and accept the community rules first. Then tap below to receive your Verified role and unlock member areas.');
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('verify_claim').setLabel('VERIFY ME')
-      .setEmoji('ð§ ').setStyle(ButtonStyle.Success)
+      .setEmoji('🧠').setStyle(ButtonStyle.Success)
   );
   await channel.send({ embeds: [embed], components: [row] });
   return replyEphemeral(interaction, `Verification panel posted in <#${channel.id}>.`);

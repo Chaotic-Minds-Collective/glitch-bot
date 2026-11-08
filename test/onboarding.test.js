@@ -50,9 +50,9 @@ function fixture(initial = ['verified', 'a'], options = {}) {
 }
 
 test('mixed replacement uses single-role REST routes and preserves concurrent authorization changes', async () => {
-  const f = fixture(['verified', 'a', 'revoked'], { beforeWrite: async () => { f.state.delete('revoked'); f.state.add('concurrent'); } });
+  const f = fixture(['verified', 'a', 'revoked'], { beforeWrite: async () => { f.state.delete('revoked'); f.state.delete('verified'); f.state.add('concurrent'); } });
   await f.load('games').selectGames(f.interaction);
-  assert.deepEqual([...f.state].sort(), ['b', 'concurrent', 'verified']);
+  assert.deepEqual([...f.state].sort(), ['b', 'concurrent']);
   assert.deepEqual(f.writes, [['put', 'b'], ['delete', 'a']]);
   assert.match(f.replies.at(-1), /updated: B/);
 });
@@ -101,12 +101,12 @@ test('rules and verification directions fall back to channel names', async () =>
   const f = fixture(['accepted', 'verified']);
   f.interaction.guild.members.fetch = async () => f.snapshot();
   await f.load('rules').acceptRules(f.interaction);
-  assert.match(f.replies.at(-1), /#verify/);
+  assert.match(f.replies.at(-1), /the verification channel/);
   await f.load('verify').verifyClaim(f.interaction);
-  assert.match(f.replies.at(-1), /#pick-your-world/);
+  assert.match(f.replies.at(-1), /the game selection channel/);
   f.state.delete('accepted');
   await f.load('verify').verifyClaim(f.interaction);
-  assert.match(f.replies.at(-1), /#rules/);
+  assert.match(f.replies.at(-1), /the rules channel/);
   assert.ok(f.replies.every((text) => !text.includes('undefined')));
 });
 
@@ -134,4 +134,20 @@ test('missing role or insufficient bot hierarchy prevents writes', async () => {
     await f.load('games').selectGames(f.interaction);
     assert.equal(f.writes.length, 0);
   }
+});
+
+test('panel payloads contain readable rules text and a valid verification emoji', async () => {
+  const f = fixture();
+  f.config.colors.primary = 0x123456;
+  f.config.channels.rules = 'rules';
+  f.config.channels.verify = 'verify';
+  const sent = [];
+  f.interaction.guild.channels = { fetch: async (id) => ({
+    id, isTextBased: () => true, send: async (payload) => sent.push(payload),
+  }) };
+  await f.load('rules').rulesPanel(f.interaction);
+  await f.load('verify').verifyPanel(f.interaction);
+  assert.equal(sent[0].embeds[0].toJSON().footer.text, 'Chaotic Gaming • Community built by gamers, for gamers.');
+  assert.equal(sent[0].components[0].toJSON().components[0].label, 'I AGREE — ACCEPT RULES');
+  assert.equal(sent[1].components[0].toJSON().components[0].emoji.name, '🧠');
 });
