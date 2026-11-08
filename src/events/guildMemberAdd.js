@@ -4,11 +4,17 @@ const config = require('../config');
 module.exports = {
   name: 'guildMemberAdd',
   async execute(client, member) {
+    const rulesStep = config.channels.rules ? `<#${config.channels.rules}>` : '#rules';
+    const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : '#verify';
+    const gamesStep = config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : '#pick-your-world';
+    const introStep = config.channels.introduceYourself ? `<#${config.channels.introduceYourself}>` : '#introduce-yourself';
+
     const welcomeEmbed = new EmbedBuilder().setColor(config.colors.primary).setTitle('SIGNAL ACQUIRED')
       .setDescription(
         `Welcome, **${member.user.username}**!\n\n` +
-        `Start in <#${config.channels.rules}> to read the Code. Then head to <#${config.channels.verify}> ` +
-        `to verify, choose your games in #pick-your-world, and introduce yourself.\n\n` +
+        `Your onboarding path:\n1. Read the Code in ${rulesStep} and accept the rules.\n` +
+        `2. Verify in ${verifyStep}.\n3. Choose your games in ${gamesStep}.\n` +
+        `4. Introduce yourself in ${introStep}.\n\n` +
         'Community hub: https://chaoticmindsgaming.com'
       )
       .setThumbnail(member.displayAvatarURL())
@@ -34,8 +40,9 @@ module.exports = {
     try {
       await member.send(
         `**SIGNAL ACQUIRED.**\nWelcome to Chaotic Gaming, ${member.user.username}.\n\n` +
-        `1. Read the Code in the rules channel.\n2. Verify in the verification channel.\n` +
-        `3. Pick your world and introduce yourself.\n\nhttps://chaoticmindsgaming.com`
+        `1. Read the Code in ${rulesStep} and accept the rules.\n2. Verify in ${verifyStep}.\n` +
+        `3. Pick your games in ${gamesStep}.\n4. Introduce yourself in ${introStep}.\n\n` +
+        'https://chaoticmindsgaming.com'
       );
     } catch { /* Members can disable direct messages. */ }
   },
