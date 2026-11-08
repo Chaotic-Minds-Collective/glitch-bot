@@ -1,35 +1,38 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
+const { requireStaff, replyEphemeral } = require('../security/permissions');
 
-/**
- * Role claim: tapping the verify button grants the Member role.
- * @param {import('discord.js').Interaction} interaction - button interaction from the verify panel
- */
 async function verifyClaim(interaction) {
-  if (!config.roles.member) {
-    return interaction.reply({ content: 'Member role not configured yet - staff, set ROLE_MEMBER in the bot config.', ephemeral: true });
+  if (!interaction.inGuild()) return replyEphemeral(interaction, 'Verification is only available inside the Chaotic Gaming server.');
+  const roleId = config.roles.member;
+  if (!roleId) return replyEphemeral(interaction, 'Verification is not configured yet. Please contact staff.');
+  const role = await interaction.guild.roles.fetch(roleId).catch(() => null);
+  if (!role) return replyEphemeral(interaction, 'The verification role could not be found. Please contact staff.');
+
+  const botMember = interaction.guild.members.me || await interaction.guild.members.fetchMe();
+  if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles) ||
+      botMember.roles.highest.comparePositionTo(role) <= 0) {
+    console.error('[Verification] Bot lacks Manage Roles or the Member role is above its highest role.');
+    return replyEphemeral(interaction, 'Verification is temporarily unavailable. Please contact staff.');
   }
-  const member = interaction.member;
-  if (member.roles.cache.has(config.roles.member)) {
-    return interaction.reply({ content: 'You are already verified, mind intact.', ephemeral: true });
-  }
-  await member.roles.add(config.roles.member);
-  await interaction.reply({ content: '**VERIFIED.** Welcome to the Collective. Pick your world in #pick-your-world.', ephemeral: true });
+
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+  if (member.roles.cache.has(role.id)) return replyEphemeral(interaction, 'You are already verified. Pick your world and introduce yourself!');
+  await member.roles.add(role, 'Member completed the self-service verification button.');
+  return replyEphemeral(interaction, '**VERIFIED.** Welcome to the Collective. Pick your world and introduce yourself!');
 }
 
-/**
- * Post the standing verify panel into the current channel. Run once via /verifypanel.
- * @param {import('discord.js').Interaction} interaction - staff-only slash interaction
- */
 async function verifyPanel(interaction) {
-  const embed = new EmbedBuilder().setColor(config.colors.primary)
-    .setTitle('VERIFICATION GATE')
-    .setDescription('Tap the button to prove you are a real mind and unlock the full server.');
+  if (!await requireStaff(interaction, 'post the verification panel')) return;
+  if (!interaction.inGuild()) return replyEphemeral(interaction, 'The verification panel can only be posted inside the server.');
+  const embed = new EmbedBuilder().setColor(config.colors.primary).setTitle('VERIFICATION GATE')
+    .setDescription('Tap the button to verify your account and unlock the member areas.');
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('verify_claim').setLabel('VERIFY ME').setEmoji('🧠').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('verify_claim').setLabel('VERIFY ME')
+      .setEmoji('🧠').setStyle(ButtonStyle.Success)
   );
   await interaction.channel.send({ embeds: [embed], components: [row] });
-  await interaction.reply({ content: 'Verify panel posted.', ephemeral: true });
+  return replyEphemeral(interaction, 'Verification panel posted.');
 }
 
 module.exports = { verifyClaim, verifyPanel };
