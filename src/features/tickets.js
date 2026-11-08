@@ -4,7 +4,7 @@ const {
   TextInputBuilder, TextInputStyle,
 } = require('discord.js');
 const config = require('../config');
-const { canCloseTicket, replyEphemeral } = require('../security/permissions');
+const { canCloseTicket, replyEphemeral, ticketOwnerId } = require('../security/permissions');
 
 function ticketChannelName(user) {
   const safeName = user.username.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 35);
@@ -14,7 +14,7 @@ function ticketChannelName(user) {
 async function findExistingTicket(guild, userId) {
   const channels = await guild.channels.fetch();
   return channels.find((channel) =>
-    channel?.type === ChannelType.GuildText && channel.topic?.includes(`ticket-owner:${userId}`)
+    channel?.type === ChannelType.GuildText && ticketOwnerId(channel) === userId
   ) || null;
 }
 
