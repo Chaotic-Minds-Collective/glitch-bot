@@ -32,12 +32,21 @@ const config = {
     modLog: process.env.CHANNEL_MOD_LOG,
     tickets: process.env.CHANNEL_TICKETS,
     verify: process.env.CHANNEL_VERIFY,
+    pickYourWorld: process.env.CHANNEL_PICK_YOUR_WORLD,
+    introduceYourself: process.env.CHANNEL_INTRODUCE_YOURSELF,
   },
   roles: {
     member: process.env.ROLE_MEMBER,
     staff: process.env.ROLE_STAFF,
     moderator: process.env.ROLE_MODERATOR,
+    rulesAccepted: process.env.ROLE_RULES_ACCEPTED,
   },
+  gameRoles: [
+    { value: '7dtd', label: '7 Days to Die', roleId: process.env.ROLE_GAME_7DTD },
+    { value: 'atlas', label: 'ATLAS', roleId: process.env.ROLE_GAME_ATLAS },
+    { value: 'ark_evolved', label: 'ARK: Survival Evolved', roleId: process.env.ROLE_GAME_ARK_EVOLVED },
+    { value: 'ark_ascended', label: 'ARK: Survival Ascended', roleId: process.env.ROLE_GAME_ARK_ASCENDED },
+  ],
   gameServers: loadGameServers(),
   colors: { primary: 0x9b5cff, danger: 0xff3ddb, ok: 0x00e5ff },
 };

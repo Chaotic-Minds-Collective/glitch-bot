@@ -1,22 +1,19 @@
-# GLITCH - Chaotic Gaming Community Bot
+# Glitch Bot
 
-"Community built by gamers, for gamers."
+Glitch is the Chaotic Gaming community bot: verification, onboarding, tickets, moderation, and live game-server status.
 
-## Features
-- Custom join ("SIGNAL ACQUIRED") and leave ("SIGNAL LOST") messages
-- One-tap verification button (grants Member role)
-- Welcome DM to every new member
-- Support tickets (private channels, close button)
-- Moderation: /warn /timeout /kick /ban /purge with mod-log
-- Live game server status in #server-status (7DtD, ARK E/SA, ATLAS via gamedig)
-- /serverstatus slash command for on-demand checks
+## Onboarding
 
-## Setup
-1. `npm install`
-2. `cp .env.example .env` and fill in token + IDs
-3. `npm run deploy` (registers slash commands)
-4. `npm start`
+The member path is welcome → rules acceptance → verification → game selection → introduction.
 
-## Rules of this repo
-- Never commit .env or the bot token.
-- Bot permissions are least-privilege; no Administrator.
+See [the onboarding setup guide](docs/ONBOARDING_SETUP.md) for the required Discord role, environment values, role hierarchy, and staff panel commands.
+
+## Local development
+
+1. Install Node.js 20 or newer.
+2. Run `npm install`.
+3. Copy `.env.example` to `.env` and fill in the bot token and server configuration.
+4. Run `npm run deploy` to register slash commands after reviewing the command set.
+5. Run `npm start`.
+
+Never commit `.env`, bot tokens, or other secrets.
