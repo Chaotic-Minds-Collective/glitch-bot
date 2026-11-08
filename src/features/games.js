@@ -137,6 +137,11 @@ async function applyGameSelection(interaction) {
 
   // All cleanup targets have passed the protected-role and bot authority checks.
   // A retry by an unverified member also retries cleanup after a failed removal.
+  /**
+   * Remove game roles from an ineligible member and confirm the cleanup.
+   * @param {import('discord.js').GuildMember} current Member to check and clean up.
+   * @returns {Promise<boolean>} True if verified; otherwise false after private guidance.
+   */
   const requireEligibility = async (current) => {
     if (current.roles.cache.has(memberRoleId)) return true;
     let cleanupFailed = false;
