@@ -101,7 +101,8 @@ async function applyGameSelection(interaction) {
 
   const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true });
   if (!member.roles.cache.has(memberRoleId)) {
-    return interaction.editReply(`Please accept the rules and verify before choosing games in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
+    const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : 'the verification channel';
+    return interaction.editReply(`Please accept the rules and verify in ${verifyStep} before choosing games.`);
   }
 
   const games = configuredGames();
@@ -141,13 +142,15 @@ async function applyGameSelection(interaction) {
   }
 
   const selectedRoleIds = new Set(selectedGames.map((game) => game.roleId));
-  const toAdd = targetRoles.filter(({ role }) => selectedRoleIds.has(role.id) && !member.roles.cache.has(role.id));
-  const toRemove = targetRoles.filter(({ role }) => !selectedRoleIds.has(role.id) && member.roles.cache.has(role.id));
+  const desiredRoleIds = new Set(member.roles.cache.keys());
+  for (const { role } of targetRoles) {
+    if (selectedRoleIds.has(role.id)) desiredRoleIds.add(role.id);
+    else desiredRoleIds.delete(role.id);
+  }
 
   let writeFailed = false;
   try {
-    for (const { role } of toAdd) await member.roles.add(role.id, 'Member selected games in the Glitch Bot game picker.');
-    for (const { role } of toRemove) await member.roles.remove(role.id, 'Member updated game selections in the Glitch Bot game picker.');
+    await member.roles.set([...desiredRoleIds], 'Member updated game selections in the Glitch Bot game picker.');
   } catch (error) {
     writeFailed = true;
     console.error('[Game Roles] Role update failed:', error);

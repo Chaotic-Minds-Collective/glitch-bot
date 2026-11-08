@@ -45,12 +45,13 @@ async function acceptRules(interaction) {
   }
 
   const member = await interaction.guild.members.fetch(interaction.user.id);
+  const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : 'the verification channel';
   if (member.roles.cache.has(role.id)) {
-    return replyEphemeral(interaction, `Your rules acceptance is already recorded. Continue in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
+    return replyEphemeral(interaction, `Your rules acceptance is already recorded. Continue in ${verifyStep}.`);
   }
 
   await member.roles.add(role, 'Member accepted the Chaotic Gaming community rules.');
-  return replyEphemeral(interaction, `Rules accepted. Your next step is verification in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
+  return replyEphemeral(interaction, `Rules accepted. Your next step is verification in ${verifyStep}.`);
 }
 
 /**
@@ -74,12 +75,12 @@ async function rulesPanel(interaction) {
       'Please read the rules above before continuing. By selecting **I Agree**, you confirm that you have read and agree to follow the Chaotic Gaming community rules.\n\n' +
       'After accepting, continue to the verification channel to unlock the member areas.'
     )
-    .setFooter({ text: 'Chaotic Gaming • Community built by gamers, for gamers.' });
+    .setFooter({ text: 'Chaotic Gaming â¢ Community built by gamers, for gamers.' });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('rules_accept')
-      .setLabel('I AGREE — ACCEPT RULES')
+      .setLabel('I AGREE â ACCEPT RULES')
       .setStyle(ButtonStyle.Success)
   );
 

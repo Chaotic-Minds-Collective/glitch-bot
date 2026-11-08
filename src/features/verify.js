@@ -20,8 +20,9 @@ async function verifyClaim(interaction) {
   if (!acceptedRole) return replyEphemeral(interaction, 'The Rules Accepted role could not be found. Please contact staff.');
 
   const member = await interaction.guild.members.fetch(interaction.user.id);
+  const rulesStep = config.channels.rules ? `<#${config.channels.rules}>` : 'the rules channel';
   if (!member.roles.cache.has(acceptedRole.id)) {
-    return replyEphemeral(interaction, `Please read and accept the rules in ${config.channels.rules ? `<#${config.channels.rules}>` : '#rules'} before verifying.`);
+    return replyEphemeral(interaction, `Please read and accept the rules in ${rulesStep} before verifying.`);
   }
 
   const roleId = config.roles.member;
@@ -36,11 +37,12 @@ async function verifyClaim(interaction) {
     return replyEphemeral(interaction, 'Verification is temporarily unavailable. Please contact staff.');
   }
 
+  const gamesStep = config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : 'the game selection channel';
   if (member.roles.cache.has(role.id)) {
-    return replyEphemeral(interaction, `You are already verified. Choose your games in ${config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : '#pick-your-world'}.`);
+    return replyEphemeral(interaction, `You are already verified. Choose your games in ${gamesStep}.`);
   }
   await member.roles.add(role, 'Member completed rules acceptance and self-service verification.');
-  return replyEphemeral(interaction, `**VERIFIED.** Welcome to the Collective. Choose your games in ${config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : '#pick-your-world'}.`);
+  return replyEphemeral(interaction, `**VERIFIED.** Welcome to the Collective. Choose your games in ${gamesStep}.`);
 }
 
 /**
@@ -61,7 +63,7 @@ async function verifyPanel(interaction) {
     .setDescription('Read and accept the community rules first. Then tap below to receive your Verified role and unlock member areas.');
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('verify_claim').setLabel('VERIFY ME')
-      .setEmoji('🧠').setStyle(ButtonStyle.Success)
+      .setEmoji('ð§ ').setStyle(ButtonStyle.Success)
   );
   await channel.send({ embeds: [embed], components: [row] });
   return replyEphemeral(interaction, `Verification panel posted in <#${channel.id}>.`);
