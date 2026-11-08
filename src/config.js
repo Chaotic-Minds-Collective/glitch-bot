@@ -2,7 +2,7 @@ require('dotenv').config();
 
 /**
  * Parse and validate the configured game-server entries.
- * @returns {Array<{name: string, type: string, host: string, port: string | number}>} Validated server entries.
+ * @returns {Array<{name: *, type: *, host: *, port: *}>} Parsed entries. The name, type, and host fields must be truthy, and Number(port) must be an integer. Original field values are returned unchanged; their types are not normalized.
  * @throws {Error} If GAME_SERVERS is invalid JSON, is not an array, or contains an invalid entry.
  */
 function loadGameServers() {
