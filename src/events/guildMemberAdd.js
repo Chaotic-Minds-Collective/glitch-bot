@@ -1,29 +1,42 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 
 module.exports = {
   name: 'guildMemberAdd',
-  /** Post the custom SIGNAL ACQUIRED join message with a verify button, then send a welcome DM. */
   async execute(client, member) {
-    const embed = new EmbedBuilder().setColor(config.colors.primary)
-      .setTitle('SIGNAL ACQUIRED')
-      .setDescription(`**${member.user.username}** has joined the Collective.\n\nGrab your roles in <#${config.channels.verify}>, decode the Code in <#${config.channels.rules}>, say hi in #introduce-yourself.`)
+    const welcomeEmbed = new EmbedBuilder().setColor(config.colors.primary).setTitle('SIGNAL ACQUIRED')
+      .setDescription(
+        `Welcome, **${member.user.username}**!\n\n` +
+        `Start in <#${config.channels.rules}> to read the Code. Then head to <#${config.channels.verify}> ` +
+        `to verify, choose your games in #pick-your-world, and introduce yourself.\n\n` +
+        'Community hub: https://chaoticmindsgaming.com'
+      )
       .setThumbnail(member.displayAvatarURL())
-      .setFooter({ text: 'Glitch is watching - approvingly.' });
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('verify_claim').setLabel('VERIFY - JOIN THE COLLECTIVE').setEmoji('🧠').setStyle(ButtonStyle.Success)
-    );
-    const ch = member.guild.channels.cache.get(config.channels.joinLog);
-    if (ch) await ch.send({ content: `Welcome <@${member.id}>`, embeds: [embed], components: [row] });
+      .setFooter({ text: 'Chaotic Gaming — Community built by gamers, for gamers.' });
 
-    // Welcome DM
+    const welcomeChannel = config.channels.welcome
+      ? await member.guild.channels.fetch(config.channels.welcome).catch(() => null) : null;
+    if (welcomeChannel?.isTextBased()) {
+      await welcomeChannel.send({ content: `Welcome <@${member.id}>!`, embeds: [welcomeEmbed] })
+        .catch((error) => console.error('[Welcome] Could not post welcome message:', error));
+    } else console.warn('[Welcome] CHANNEL_WELCOME is missing or is not a text channel.');
+
+    const joinLog = config.channels.joinLog
+      ? await member.guild.channels.fetch(config.channels.joinLog).catch(() => null) : null;
+    if (joinLog?.isTextBased()) {
+      const logEmbed = new EmbedBuilder().setColor(config.colors.ok).setTitle('MEMBER JOINED')
+        .setDescription(`${member.user.tag} joined the server.`)
+        .setThumbnail(member.displayAvatarURL()).setTimestamp();
+      await joinLog.send({ embeds: [logEmbed] })
+        .catch((error) => console.error('[Join Log] Could not post join log:', error));
+    }
+
     try {
       await member.send(
         `**SIGNAL ACQUIRED.**\nWelcome to Chaotic Gaming, ${member.user.username}.\n\n` +
-        `You have joined a community built by gamers, for gamers.\n` +
-        `1. Verify in <#${config.channels.verify}>\n2. Read the Code in <#${config.channels.rules}>\n` +
-        `3. Introduce yourself and pick your world.\n\nchaoticmindsgaming.com`
+        `1. Read the Code in the rules channel.\n2. Verify in the verification channel.\n` +
+        `3. Pick your world and introduce yourself.\n\nhttps://chaoticmindsgaming.com`
       );
-    } catch { /* DMs closed - fine */ }
+    } catch { /* Members can disable direct messages. */ }
   },
 };

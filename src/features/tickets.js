@@ -1,46 +1,89 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const {
+  ChannelType, PermissionFlagsBits, MessageFlags, EmbedBuilder,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder,
+  TextInputBuilder, TextInputStyle,
+} = require('discord.js');
 const config = require('../config');
-const counters = new Map();
+const { canCloseTicket, replyEphemeral, ticketOwnerId } = require('../security/permissions');
 
-/**
- * Handle all ticket interactions: open modal, create private channel, close.
- * @param {import('discord.js').Interaction} interaction - button or modal interaction with a ticket_* customId
- */
+function ticketChannelName(user) {
+  const safeName = user.username.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 35);
+  return `ticket-${safeName || 'member'}-${user.id.slice(-4)}`.slice(0, 90);
+}
+
+async function findExistingTicket(guild, userId) {
+  const channels = await guild.channels.fetch();
+  return channels.find((channel) =>
+    channel?.type === ChannelType.GuildText && ticketOwnerId(channel) === userId
+  ) || null;
+}
+
 async function handleTicket(interaction) {
+  if (!interaction.inGuild()) return replyEphemeral(interaction, 'Tickets can only be used inside the Chaotic Gaming server.');
+
   if (interaction.isButton() && interaction.customId === 'ticket_open') {
+    const existing = await findExistingTicket(interaction.guild, interaction.user.id);
+    if (existing) return replyEphemeral(interaction, `You already have an open ticket: ${existing}`);
     const modal = new ModalBuilder().setCustomId('ticket_reason').setTitle('Open a ticket')
       .addComponents(new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?').setStyle(TextInputStyle.Paragraph).setRequired(true)
+        new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?')
+          .setStyle(TextInputStyle.Paragraph).setMaxLength(1000).setRequired(true)
       ));
     return interaction.showModal(modal);
   }
+
   if (interaction.isModalSubmit() && interaction.customId === 'ticket_reason') {
-    const reason = interaction.fields.getTextInputValue('reason').slice(0, 1000);
-    const n = (counters.get(interaction.guild.id) || 0) + 1;
-    counters.set(interaction.guild.id, n);
+    const existing = await findExistingTicket(interaction.guild, interaction.user.id);
+    if (existing) return replyEphemeral(interaction, `You already have an open ticket: ${existing}`);
+    const reason = interaction.fields.getTextInputValue('reason').trim().slice(0, 1000);
+    if (!reason) return replyEphemeral(interaction, 'Please provide a short description before opening a ticket.');
+
     const overwrites = [
-      { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
       { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: interaction.user.id, allow: [
+        PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles,
+      ] },
     ];
-    if (config.roles.staff) overwrites.push({ id: config.roles.staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
-    const ch = await interaction.guild.channels.create({
-      name: `ticket-${n.toString().padStart(4, '0')}-${interaction.user.username}`.slice(0, 100),
+    for (const roleId of [config.roles.staff, config.roles.moderator].filter(Boolean)) {
+      overwrites.push({ id: roleId, allow: [
+        PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+      ] });
+    }
+
+    const channel = await interaction.guild.channels.create({
+      name: ticketChannelName(interaction.user),
       type: ChannelType.GuildText,
       parent: config.channels.tickets || undefined,
+      topic: `ticket-owner:${interaction.user.id}`,
       permissionOverwrites: overwrites,
+      reason: `Support ticket opened by ${interaction.user.tag}`,
     });
-    const embed = new EmbedBuilder().setColor(config.colors.primary)
-      .setTitle(`Ticket #${n}`).setDescription(`Opened by ${interaction.user}\n**Issue:** ${reason}`).setTimestamp();
+
+    const embed = new EmbedBuilder().setColor(config.colors.primary).setTitle('SUPPORT TICKET')
+      .setDescription(`Opened by ${interaction.user}\n\n**Issue:** ${reason}`).setTimestamp();
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket_close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId('ticket_close').setLabel('Close ticket')
+        .setEmoji('🔒').setStyle(ButtonStyle.Danger)
     );
-    const mention = config.roles.staff ? `<@${interaction.user.id}> <@&${config.roles.staff}>` : `<@${interaction.user.id}>`;
-    await ch.send({ content: mention, embeds: [embed], components: [row] });
-    return interaction.reply({ content: `Ticket opened: <#${ch.id}>`, ephemeral: true });
+    await channel.send({
+      content: config.roles.staff ? `<@${interaction.user.id}> <@&${config.roles.staff}>` : `<@${interaction.user.id}>`,
+      embeds: [embed], components: [row],
+      allowedMentions: { users: [interaction.user.id], roles: config.roles.staff ? [config.roles.staff] : [] },
+    });
+    return replyEphemeral(interaction, `Your private ticket is ready: ${channel}`);
   }
+
   if (interaction.isButton() && interaction.customId === 'ticket_close') {
-    await interaction.reply({ content: 'Closing in 5 seconds.' });
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+    if (!canCloseTicket(interaction, interaction.channel)) {
+      return replyEphemeral(interaction, 'Only the ticket owner or authorized staff can close this ticket.');
+    }
+    await interaction.reply({ content: 'This ticket will close in 5 seconds.', flags: MessageFlags.Ephemeral });
+    setTimeout(() => {
+      interaction.channel.delete(`Ticket closed by ${interaction.user.tag}`).catch((error) =>
+        console.error('Ticket deletion failed:', error));
+    }, 5000);
   }
 }
 
