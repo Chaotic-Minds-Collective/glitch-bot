@@ -21,7 +21,7 @@ async function verifyClaim(interaction) {
 
   const member = await interaction.guild.members.fetch(interaction.user.id);
   if (!member.roles.cache.has(acceptedRole.id)) {
-    return replyEphemeral(interaction, `Please read and accept the rules in <#${config.channels.rules}> before verifying.`);
+    return replyEphemeral(interaction, `Please read and accept the rules in ${config.channels.rules ? `<#${config.channels.rules}>` : '#rules'} before verifying.`);
   }
 
   const roleId = config.roles.member;
@@ -37,10 +37,10 @@ async function verifyClaim(interaction) {
   }
 
   if (member.roles.cache.has(role.id)) {
-    return replyEphemeral(interaction, `You are already verified. Choose your games in <#${config.channels.pickYourWorld}>.`);
+    return replyEphemeral(interaction, `You are already verified. Choose your games in ${config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : '#pick-your-world'}.`);
   }
   await member.roles.add(role, 'Member completed rules acceptance and self-service verification.');
-  return replyEphemeral(interaction, `**VERIFIED.** Welcome to the Collective. Choose your games in <#${config.channels.pickYourWorld}>.`);
+  return replyEphemeral(interaction, `**VERIFIED.** Welcome to the Collective. Choose your games in ${config.channels.pickYourWorld ? `<#${config.channels.pickYourWorld}>` : '#pick-your-world'}.`);
 }
 
 /**

@@ -46,11 +46,11 @@ async function acceptRules(interaction) {
 
   const member = await interaction.guild.members.fetch(interaction.user.id);
   if (member.roles.cache.has(role.id)) {
-    return replyEphemeral(interaction, `Your rules acceptance is already recorded. Continue in <#${config.channels.verify}>.`);
+    return replyEphemeral(interaction, `Your rules acceptance is already recorded. Continue in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
   }
 
   await member.roles.add(role, 'Member accepted the Chaotic Gaming community rules.');
-  return replyEphemeral(interaction, `Rules accepted. Your next step is verification in <#${config.channels.verify}>.`);
+  return replyEphemeral(interaction, `Rules accepted. Your next step is verification in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
 }
 
 /**

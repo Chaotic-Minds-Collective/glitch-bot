@@ -2,10 +2,13 @@ const {
   ActionRowBuilder,
   EmbedBuilder,
   PermissionFlagsBits,
+  MessageFlags,
   StringSelectMenuBuilder,
 } = require('discord.js');
 const config = require('../config');
 const { requireStaff, replyEphemeral } = require('../security/permissions');
+
+const activeSelections = new Set();
 
 /**
  * Return game options that have a configured Discord role ID.
@@ -61,27 +64,58 @@ async function gamePanel(interaction) {
 /**
  * Update only configured game roles for a verified guild member.
  * Reject unknown selections, mixed clear/game choices, and unassignable roles
- * before adding or removing roles; then reply with the resulting selection.
+ * before adding or removing roles. Defer the reply, exclude overlapping requests
+ * in this process, and confirm the game-role subset before reporting success.
  * @param {import('discord.js').StringSelectMenuInteraction} interaction Game choices.
  * @returns {Promise<unknown>} Completion of the private selection response.
  */
 async function selectGames(interaction) {
   if (!interaction.inGuild()) return replyEphemeral(interaction, 'Game selection is only available inside Chaotic Gaming.');
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const key = `${interaction.guild.id}:${interaction.user.id}`;
+  if (activeSelections.has(key)) {
+    return interaction.editReply('Your previous game selection is still being processed. Please try again after it finishes.');
+  }
+  activeSelections.add(key);
+  try {
+    return await applyGameSelection(interaction);
+  } catch (error) {
+    console.error('[Game Roles] Selection could not be completed:', error);
+    return interaction.editReply('Your game role update could not be confirmed and may be incomplete. Please try again or contact staff.');
+  } finally {
+    activeSelections.delete(key);
+  }
+}
+
+/**
+ * Apply one member's validated selection with role-specific writes, then fetch
+ * current roles to confirm success. Failed writes may leave a partial selection.
+ * @param {import('discord.js').StringSelectMenuInteraction} interaction Deferred selection.
+ * @returns {Promise<unknown>} Completion of the edited private response.
+ */
+async function applyGameSelection(interaction) {
+  if (!interaction.inGuild()) return interaction.editReply('Game selection is only available inside Chaotic Gaming.');
 
   const memberRoleId = config.roles.member;
-  if (!memberRoleId) return replyEphemeral(interaction, 'Verification is not configured. Please contact staff.');
+  if (!memberRoleId) return interaction.editReply('Verification is not configured. Please contact staff.');
 
-  const member = await interaction.guild.members.fetch(interaction.user.id);
+  const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true });
   if (!member.roles.cache.has(memberRoleId)) {
-    return replyEphemeral(interaction, `Please accept the rules and verify before choosing games in <#${config.channels.verify}>.`);
+    return interaction.editReply(`Please accept the rules and verify before choosing games in ${config.channels.verify ? `<#${config.channels.verify}>` : '#verify'}.`);
   }
 
   const games = configuredGames();
-  if (!games.length) return replyEphemeral(interaction, 'Game roles are not configured yet. Please contact staff.');
+  if (!games.length) return interaction.editReply('Game roles are not configured yet. Please contact staff.');
+
+  const protectedRoles = new Set(Object.values(config.roles).filter(Boolean));
+  const gameRoleIds = games.map((game) => game.roleId);
+  if (new Set(gameRoleIds).size !== games.length || gameRoleIds.some((id) => protectedRoles.has(id))) {
+    return interaction.editReply('Game role configuration overlaps other roles. Please contact staff.');
+  }
 
   const selected = interaction.values;
   if (selected.includes('none') && selected.length !== 1) {
-    return replyEphemeral(interaction, 'Choose either game roles or the clear option, not both.');
+    return interaction.editReply('Choose either game roles or the clear option, not both.');
   }
 
   const selectedGames = selected.includes('none')
@@ -89,13 +123,13 @@ async function selectGames(interaction) {
     : games.filter((game) => selected.includes(game.value));
 
   if (selectedGames.length !== (selected.includes('none') ? 0 : selected.length)) {
-    return replyEphemeral(interaction, 'One or more game selections are not recognized. Please try again.');
+    return interaction.editReply('One or more game selections are not recognized. Please try again.');
   }
 
   const targetRoles = [];
   for (const game of games) {
     const role = await interaction.guild.roles.fetch(game.roleId).catch(() => null);
-    if (!role) return replyEphemeral(interaction, `The ${game.label} role is missing. Please contact staff.`);
+    if (!role) return interaction.editReply(`The ${game.label} role is missing. Please contact staff.`);
     targetRoles.push({ game, role });
   }
 
@@ -103,21 +137,36 @@ async function selectGames(interaction) {
   if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles) ||
       targetRoles.some(({ role }) => botMember.roles.highest.comparePositionTo(role) <= 0)) {
     console.error('[Game Roles] Bot lacks Manage Roles or a game role is above its highest role.');
-    return replyEphemeral(interaction, 'Game role updates are temporarily unavailable. Please contact staff.');
+    return interaction.editReply('Game role updates are temporarily unavailable. Please contact staff.');
   }
 
   const selectedRoleIds = new Set(selectedGames.map((game) => game.roleId));
   const toAdd = targetRoles.filter(({ role }) => selectedRoleIds.has(role.id) && !member.roles.cache.has(role.id));
   const toRemove = targetRoles.filter(({ role }) => !selectedRoleIds.has(role.id) && member.roles.cache.has(role.id));
 
-  if (toAdd.length) await member.roles.add(toAdd.map(({ role }) => role), 'Member selected games in the Glitch Bot game picker.');
-  if (toRemove.length) await member.roles.remove(toRemove.map(({ role }) => role), 'Member updated game selections in the Glitch Bot game picker.');
+  let writeFailed = false;
+  try {
+    for (const { role } of toAdd) await member.roles.add(role.id, 'Member selected games in the Glitch Bot game picker.');
+    for (const { role } of toRemove) await member.roles.remove(role.id, 'Member updated game selections in the Glitch Bot game picker.');
+  } catch (error) {
+    writeFailed = true;
+    console.error('[Game Roles] Role update failed:', error);
+  }
+
+  const current = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
+  if (!current) {
+    return interaction.editReply('Your game role update could not be confirmed and may be incomplete. Please try again or contact staff.');
+  }
+  if (writeFailed || targetRoles.some(({ role }) => current.roles.cache.has(role.id) !== selectedRoleIds.has(role.id))) {
+    const actual = games.filter((game) => current.roles.cache.has(game.roleId)).map((game) => game.label);
+    return interaction.editReply(`Your game role update is incomplete. Current game roles: ${actual.join(', ') || 'none'}. Please try again or contact staff.`);
+  }
 
   const summary = selectedGames.length
     ? `Your game roles are updated: ${selectedGames.map((game) => game.label).join(', ')}.`
     : 'Your game roles have been cleared.';
   const intro = config.channels.introduceYourself ? ` When you're ready, introduce yourself in <#${config.channels.introduceYourself}>.` : '';
-  return replyEphemeral(interaction, summary + intro);
+  return interaction.editReply(summary + intro);
 }
 
 module.exports = { gamePanel, selectGames };
