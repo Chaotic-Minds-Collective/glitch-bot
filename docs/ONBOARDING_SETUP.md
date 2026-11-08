@@ -8,11 +8,15 @@ Glitch's onboarding sequence is:
 4. Choose game roles in `#pick-your-world`.
 5. Introduce yourself in `#introduce-yourself`.
 
-## One required Discord setup item
+## Rules Accepted role
 
-The server currently has no dedicated rules-acceptance role. Create a role named **Rules Accepted** in Discord and copy its role ID into `ROLE_RULES_ACCEPTED` in the bot's environment.
+The **Rules Accepted** role has been created in Chaotic Gaming:
+- Role ID: `1568836462764494990`
+- Permissions: none
+- Mentionable: no
+- Hoisted: no
 
-Place **Rules Accepted** below the Glitch Bot role so Glitch can assign it. Keep the existing **Verified** role and game roles below Glitch Bot as well. Do not give Rules Accepted any member-area permissions; it is only an acceptance marker.
+Its ID is configured as `ROLE_RULES_ACCEPTED` in `.env.example`. Keep the role below Glitch Bot in the role hierarchy. Do not give it member-area permissions; it is only an acceptance marker.
 
 This role is intentionally separate from Verified:
 - Rules Accepted proves the member pressed the rules acceptance button.
@@ -20,7 +24,7 @@ This role is intentionally separate from Verified:
 
 ## Environment
 
-Copy the new values from `.env.example` into the deployment environment. Never commit `.env` or a real Discord token.
+Copy the values from `.env.example` into the bot's environment. Never commit `.env` or a real Discord token.
 
 The existing game roles are configured by ID:
 - 7 Days to Die
