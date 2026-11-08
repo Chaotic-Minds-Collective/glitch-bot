@@ -49,10 +49,10 @@ function fixture(initial = ['verified', 'a'], options = {}) {
   return { config, state, replies, writes, interaction, load, snapshot };
 }
 
-test('mixed replacement uses single-role REST routes and preserves concurrent authorization changes', async () => {
-  const f = fixture(['verified', 'a', 'revoked'], { beforeWrite: async () => { f.state.delete('revoked'); f.state.delete('verified'); f.state.add('concurrent'); } });
+test('mixed replacement preserves unrelated concurrent role changes', async () => {
+  const f = fixture(['verified', 'a', 'revoked'], { beforeWrite: async () => { f.state.delete('revoked'); f.state.add('concurrent'); } });
   await f.load('games').selectGames(f.interaction);
-  assert.deepEqual([...f.state].sort(), ['b', 'concurrent']);
+  assert.deepEqual([...f.state].sort(), ['b', 'concurrent', 'verified']);
   assert.deepEqual(f.writes, [['put', 'b'], ['delete', 'a']]);
   assert.match(f.replies.at(-1), /updated: B/);
 });
@@ -84,15 +84,16 @@ test('overlapping selections are rejected while first selection finishes', async
   assert.deepEqual([...f.state].sort(), ['b', 'verified']);
 });
 
-test('unknown, mixed clear, unverified and protected/duplicate mappings never mutate roles', async () => {
+test('invalid selections and protected/duplicate mappings never mutate roles; unverified selections only clean up', async () => {
   for (const kind of ['unknown', 'mixed', 'unverified', 'protected', 'duplicate']) {
-    const f = fixture(kind === 'unverified' ? ['a'] : undefined);
+    const f = fixture(kind === 'unverified' ? [] : undefined);
     if (kind === 'unknown') f.interaction.values = ['unknown'];
     if (kind === 'mixed') f.interaction.values = ['none', 'a'];
     if (kind === 'protected') f.config.gameRoles[0].roleId = 'staff';
     if (kind === 'duplicate') f.config.gameRoles[0].roleId = 'b';
     await f.load('games').selectGames(f.interaction);
-    assert.equal(f.writes.length, 0, kind);
+    if (kind === 'unverified') assert.ok(f.writes.every(([method]) => method === 'delete'));
+    else assert.equal(f.writes.length, 0, kind);
     assert.doesNotMatch(f.replies.at(-1), /undefined/);
   }
 });
@@ -150,4 +151,57 @@ test('panel payloads contain readable rules text and a valid verification emoji'
   assert.equal(sent[0].embeds[0].toJSON().footer.text, 'Chaotic Gaming • Community built by gamers, for gamers.');
   assert.equal(sent[0].components[0].toJSON().components[0].label, 'I AGREE — ACCEPT RULES');
   assert.equal(sent[1].components[0].toJSON().components[0].emoji.name, '🧠');
+});
+
+
+test('revocation during a grant clears game roles and preserves unrelated roles', async () => {
+  const f = fixture(['verified', 'a', 'unrelated'], { beforeWrite: async () => { f.state.delete('verified'); } });
+  await f.load('games').selectGames(f.interaction);
+  assert.deepEqual([...f.state], ['unrelated']);
+  assert.match(f.replies.at(-1), /verify.*before choosing games/);
+  assert.doesNotMatch(f.replies.at(-1), /are updated/);
+});
+
+test('revocation during validation prevents grants', async () => {
+  const f = fixture();
+  f.interaction.guild.roles.fetch = async (id) => { f.state.delete('verified'); return { id }; };
+  await f.load('games').selectGames(f.interaction);
+  assert.equal(f.writes.filter(([method]) => method === 'put').length, 0);
+  assert.equal(f.state.size, 0);
+});
+
+test('failed eligibility cleanup is reported and retried on the next selection', async () => {
+  const options = { failRemove: true, beforeWrite: async () => { f.state.delete('verified'); } };
+  const f = fixture(undefined, options);
+  const games = f.load('games');
+  await games.selectGames(f.interaction);
+  assert.match(f.replies.at(-1), /cleanup could not be confirmed.*try again or contact staff/);
+  assert.ok(f.state.has('b'));
+  options.failRemove = false;
+  await games.selectGames(f.interaction);
+  assert.equal(f.state.size, 0);
+  assert.match(f.replies.at(-1), /cleared/);
+});
+
+
+test('revocation between multiple grants stops further grants and reconciles all game roles', async () => {
+  const f = fixture(['verified', 'unrelated'], { beforeWrite: async () => { f.state.delete('verified'); } });
+  f.interaction.values = ['a', 'b'];
+  await f.load('games').selectGames(f.interaction);
+  assert.deepEqual(f.writes.filter(([method]) => method === 'put'), [['put', 'a']]);
+  assert.deepEqual([...f.state], ['unrelated']);
+  assert.doesNotMatch(f.replies.at(-1), /are updated/);
+});
+
+
+test('terminal eligibility check clears roles when no additions were needed', async () => {
+  const f = fixture(['verified', 'b', 'unrelated']);
+  let fetches = 0;
+  f.interaction.guild.members.fetch = async () => {
+    if (++fetches === 2) f.state.delete('verified');
+    return f.snapshot();
+  };
+  await f.load('games').selectGames(f.interaction);
+  assert.deepEqual([...f.state], ['unrelated']);
+  assert.match(f.replies.at(-1), /verify.*before choosing games/);
 });

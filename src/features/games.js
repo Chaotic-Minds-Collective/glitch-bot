@@ -99,12 +99,6 @@ async function applyGameSelection(interaction) {
   const memberRoleId = config.roles.member;
   if (!memberRoleId) return interaction.editReply('Verification is not configured. Please contact staff.');
 
-  const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true });
-  if (!member.roles.cache.has(memberRoleId)) {
-    const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : 'the verification channel';
-    return interaction.editReply(`Please accept the rules and verify in ${verifyStep} before choosing games.`);
-  }
-
   const games = configuredGames();
   if (!games.length) return interaction.editReply('Game roles are not configured yet. Please contact staff.');
 
@@ -141,12 +135,40 @@ async function applyGameSelection(interaction) {
     return interaction.editReply('Game role updates are temporarily unavailable. Please contact staff.');
   }
 
+  // All cleanup targets have passed the protected-role and bot authority checks.
+  // A retry by an unverified member also retries cleanup after a failed removal.
+  const requireEligibility = async (current) => {
+    if (current.roles.cache.has(memberRoleId)) return true;
+    let cleanupFailed = false;
+    for (const { role } of targetRoles) {
+      try {
+        await current.roles.remove(role.id, 'Game selection eligibility was revoked.');
+      } catch (error) {
+        cleanupFailed = true;
+        console.error('[Game Roles] Eligibility cleanup failed:', error);
+      }
+    }
+    const confirmed = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
+    if (cleanupFailed || !confirmed || targetRoles.some(({ role }) => confirmed.roles.cache.has(role.id))) {
+      await interaction.editReply('Verification is required. Game role cleanup could not be confirmed. Please try again or contact staff.');
+    } else {
+      const verifyStep = config.channels.verify ? `<#${config.channels.verify}>` : 'the verification channel';
+      await interaction.editReply(`Your game roles have been cleared. Please accept the rules and verify in ${verifyStep} before choosing games.`);
+    }
+    return false;
+  };
+
+  const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true });
+  if (!await requireEligibility(member)) return;
+
   const selectedRoleIds = new Set(selectedGames.map((game) => game.roleId));
   const additions = targetRoles.filter(({ role }) => selectedRoleIds.has(role.id) && !member.roles.cache.has(role.id));
   const removals = targetRoles.filter(({ role }) => !selectedRoleIds.has(role.id) && member.roles.cache.has(role.id));
   const reason = 'Member updated game selections in the Glitch Bot game picker.';
   let writeFailed = false;
   for (const { role } of additions) {
+    const eligible = await interaction.guild.members.fetch({ user: interaction.user.id, force: true });
+    if (!await requireEligibility(eligible)) return;
     try {
       await member.roles.add(role.id, reason);
     } catch (error) {
@@ -167,6 +189,7 @@ async function applyGameSelection(interaction) {
   if (!current) {
     return interaction.editReply('Your game role update could not be confirmed and may be incomplete. Please try again or contact staff.');
   }
+  if (!await requireEligibility(current)) return;
   if (writeFailed || targetRoles.some(({ role }) => current.roles.cache.has(role.id) !== selectedRoleIds.has(role.id))) {
     const actual = games.filter((game) => current.roles.cache.has(game.roleId)).map((game) => game.label);
     return interaction.editReply(`Your game role update is incomplete. Current game roles: ${actual.join(', ') || 'none'}. Please try again or contact staff.`);
