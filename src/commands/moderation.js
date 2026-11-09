@@ -110,13 +110,19 @@ async function authorizeStaffAction(interaction) {
  */
 async function modLog(guild, embed) {
   if (!config.channels.modLog) return false;
-  const ch = guild.channels.cache.get(config.channels.modLog);
+  let ch;
+  try {
+    ch = await guild.channels.fetch(config.channels.modLog);
+  } catch (error) {
+    console.error('[Moderation Log Error] Could not fetch mod-log channel:', error);
+    return false;
+  }
   if (!ch || typeof ch.send !== 'function') return false;
   try {
     await ch.send({ embeds: [embed] });
     return true;
   } catch (error) {
-    console.error('[Moderation Log Error]', error);
+    console.error('[Moderation Log Error] Could not send mod-log entry:', error);
     return false;
   }
 }
@@ -234,5 +240,5 @@ const moderationCommands = [
   },
  ];
 
-moderationCommands.helpers = { hasStaffAccess, authorizeMemberAction };
+moderationCommands.helpers = { hasStaffAccess, authorizeMemberAction, modLog };
 module.exports = moderationCommands;
