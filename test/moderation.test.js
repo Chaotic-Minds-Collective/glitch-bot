@@ -70,8 +70,17 @@ test('timeout and purge slash-command options enforce their supported bounds', (
   assert.equal(minutes.min_value, 1);
   assert.equal(minutes.max_value, 40320);
 
-  const purge = commands.find((command) => command.data.name === 'purge').data.toJSON();
-  const count = purge.options.find((option) => option.name === 'count');
+  const purgeCommand = commands.find((command) => command.data.name === 'purge').data.toJSON();
+  const count = purgeCommand.options.find((option) => option.name === 'count');
   assert.equal(count.min_value, 1);
   assert.equal(count.max_value, 100);
+
+  // Configured Moderator and Support Team roles have ModerateMembers in the live guild.
+  // Runtime checks enforce the configured staff-role allowlist; the bot must hold
+  // KickMembers, BanMembers, and ManageMessages respectively to perform each action.
+  const expectedDefault = timeout.default_member_permissions;
+  for (const name of ['warn', 'timeout', 'kick', 'ban', 'purge']) {
+    const command = commands.find((item) => item.data.name === name).data.toJSON();
+    assert.equal(command.default_member_permissions, expectedDefault, name);
+  }
 });

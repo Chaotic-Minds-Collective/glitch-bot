@@ -124,7 +124,7 @@ const moderationCommands = [
       .setDescription('Kick a member')
       .addUserOption((o) => o.setName('member').setDescription('Member').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
-      .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
     /** Handle /kick: remove the member from the guild and log it. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
@@ -143,7 +143,7 @@ const moderationCommands = [
       .setDescription('Ban a member')
       .addUserOption((o) => o.setName('member').setDescription('Member').setRequired(true))
       .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
-      .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
     /** Handle /ban: ban the member from the guild and log it. */
     async execute(client, interaction) {
       const member = interaction.options.getMember('member');
@@ -161,7 +161,7 @@ const moderationCommands = [
       .setName('purge')
       .setDescription('Bulk delete messages in this channel')
       .addIntegerOption((o) => o.setName('count').setDescription('1-100').setRequired(true).setMinValue(1).setMaxValue(100))
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
     /** Handle /purge: bulk-delete recent messages in the current channel and log the result. */
     async execute(client, interaction) {
       if (!await authorizeStaffAction(interaction)) return;
