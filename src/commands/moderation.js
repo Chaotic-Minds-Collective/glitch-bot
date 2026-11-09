@@ -3,26 +3,58 @@ const config = require('../config');
 
 const MAX_TIMEOUT_MINUTES = 28 * 24 * 60;
 
+/**
+ * Return role IDs for either a cached GuildMember or raw interaction member.
+ * @param {object} member Discord member representation.
+ * @returns {string[]} Role IDs held by the member.
+ */
 function roleIdsFor(member) {
   if (Array.isArray(member?.roles)) return member.roles;
   if (member?.roles?.cache) return [...member.roles.cache.keys()];
   return [];
 }
 
+/**
+ * Check whether the invoker has an explicitly configured staff role or owner ID.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Incoming command interaction.
+ * @returns {boolean} Whether the invoker is authorized for staff-only commands.
+ */
 function hasStaffAccess(interaction) {
   if (config.ownerId && interaction.user.id === config.ownerId) return true;
   const allowedRoles = [config.roles.staff, config.roles.moderator].filter(Boolean);
   return roleIdsFor(interaction.member).some((roleId) => allowedRoles.includes(roleId));
 }
 
+/**
+ * Reply privately and indicate that a guard rejected the action.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Incoming interaction.
+ * @param {string} content Rejection explanation.
+ * @returns {Promise<boolean>} Always false.
+ */
 async function reject(interaction, content) {
   await interaction.reply({ content, ephemeral: true });
   return false;
 }
 
 /**
- * Require configured staff access and protect Discord role hierarchy for
- * member-targeted actions. Platform permission defaults remain an additional gate.
+ * Resolve a target into a cached/fetched GuildMember with hierarchy data.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Incoming interaction.
+ * @param {object} candidate Member candidate from the command option.
+ * @returns {Promise<import('discord.js').GuildMember|null>} Resolved guild member or null.
+ */
+async function resolveGuildMember(interaction, candidate) {
+  if (candidate?.roles?.highest) return candidate;
+  const id = candidate?.id || candidate?.user?.id;
+  if (!id) return null;
+  return interaction.guild.members.fetch(id).catch(() => null);
+}
+
+/**
+ * Require configured staff access and fail closed if member role hierarchy cannot
+ * be resolved. Protect both the invoker and bot hierarchy for member actions.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Incoming command interaction.
+ * @param {import('discord.js').GuildMember|null} target Member targeted by the action.
+ * @returns {Promise<boolean>} Whether the action is authorized.
  */
 async function authorizeMemberAction(interaction, target) {
   if (!hasStaffAccess(interaction)) {
@@ -32,15 +64,29 @@ async function authorizeMemberAction(interaction, target) {
   if (target.id === interaction.user.id) return reject(interaction, 'You cannot use this command on yourself.');
   if (target.id === interaction.guild.ownerId) return reject(interaction, 'The server owner cannot be targeted by this command.');
 
-  const invoker = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const fetchedInvoker = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const invoker = fetchedInvoker
+    || interaction.guild.members.cache?.get(interaction.user.id)
+    || (interaction.member?.roles?.highest ? interaction.member : null);
+  const targetMember = await resolveGuildMember(interaction, target);
   const botMember = interaction.guild.members.me;
   const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
-  if (!isGuildOwner && invoker?.roles?.highest && target.roles?.highest
-      && invoker.roles.highest.comparePositionTo(target.roles.highest) <= 0) {
-    return reject(interaction, 'Your highest role must be above the target member’s highest role.');
+
+  if (!targetMember?.roles?.highest) {
+    return reject(interaction, 'Unable to verify the target member’s role hierarchy. Try again later.');
   }
-  if (botMember?.roles?.highest && target.roles?.highest
-      && botMember.roles.highest.comparePositionTo(target.roles.highest) <= 0) {
+  if (!isGuildOwner) {
+    if (!invoker?.roles?.highest) {
+      return reject(interaction, 'Unable to verify your role hierarchy. Try again later.');
+    }
+    if (invoker.roles.highest.comparePositionTo(targetMember.roles.highest) <= 0) {
+      return reject(interaction, 'Your highest role must be above the target member’s highest role.');
+    }
+  }
+  if (!botMember?.roles?.highest) {
+    return reject(interaction, 'Unable to verify Glitch’s role hierarchy. Try again later.');
+  }
+  if (botMember.roles.highest.comparePositionTo(targetMember.roles.highest) <= 0) {
     return reject(interaction, 'Glitch’s highest role must be above the target member’s highest role.');
   }
   return true;
