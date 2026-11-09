@@ -11,10 +11,6 @@ process.env.ROLE_MODERATOR = 'moderator-role';
 const commands = require('../src/commands/moderation');
 const { hasStaffAccess, authorizeMemberAction } = commands.helpers;
 
-function roleAt(position) {
-  return { comparePositionTo(other) { return position - other.position; }, position };
-}
-
 function interactionFor({ userId = 'staff-user', roles = ['staff-role'], invokerPosition = 5, targetPosition = 2, botPosition = 10, targetId = 'target-user' } = {}) {
   const replies = [];
   const target = { id: targetId, roles: { highest: { position: targetPosition, comparePositionTo(other) { return targetPosition - other.position; } } } };
@@ -53,7 +49,7 @@ test('member action authorization rejects target at or above invoker hierarchy',
 });
 
 test('member action authorization rejects targets above Glitch hierarchy', async () => {
-  const interaction = interactionFor({ invokerPosition: 8, targetPosition: 9, botPosition: 7 });
+  const interaction = interactionFor({ invokerPosition: 10, targetPosition: 9, botPosition: 7 });
   assert.equal(await authorizeMemberAction(interaction, interaction.target), false);
   assert.match(interaction.replies[0].content, /Glitch.*highest role/i);
 });
