@@ -92,6 +92,11 @@ async function authorizeMemberAction(interaction, target) {
   return true;
 }
 
+/**
+ * Require configured staff access for non-member-targeted moderation commands.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction Incoming command interaction.
+ * @returns {Promise<boolean>} Whether the invoker is authorized.
+ */
 async function authorizeStaffAction(interaction) {
   if (!hasStaffAccess(interaction)) {
     return reject(interaction, 'You need the configured Staff or Moderator role to use this command.');
@@ -116,6 +121,11 @@ async function modLog(guild, embed) {
   }
 }
 
+/**
+ * Format a user-facing note about whether the moderation log was delivered.
+ * @param {boolean} success Whether the log send completed successfully.
+ * @returns {string} The log status message.
+ */
 function logStatus(success) {
   return success ? 'Logged.' : 'Warning: the moderation log could not be delivered.';
 }
