@@ -45,7 +45,7 @@ function interactionFor({
     },
   };
   const guildMemberCache = new Map();
-  if (invoker.roles.highest) guildMemberCache.set(userId, invoker);
+  if (invoker.roles.highest && !invokerFetchReject) guildMemberCache.set(userId, invoker);
   return {
     replies,
     target,
@@ -110,6 +110,12 @@ test('member action authorization rejects missing, self, and guild-owner targets
   const guildOwnerTarget = interactionFor({ targetId: 'guild-owner' });
   assert.equal(await authorizeMemberAction(guildOwnerTarget, guildOwnerTarget.target), false);
   assert.match(guildOwnerTarget.replies[0].content, /server owner cannot be targeted/i);
+});
+
+test('raw target member is fetched to resolve role hierarchy before authorization', async () => {
+  const rawTarget = interactionFor({ targetHasHighest: false, targetPosition: 2, invokerPosition: 5, botPosition: 10 });
+  assert.equal(await authorizeMemberAction(rawTarget, rawTarget.target), true);
+  assert.equal(rawTarget.replies.length, 0);
 });
 
 test('member action authorization fails closed when invoker or target hierarchy cannot be resolved', async () => {
