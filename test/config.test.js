@@ -65,20 +65,37 @@ test('a non-array game server value is rejected', () => {
   );
 });
 
-test('game server entries require truthy name, type, host, and an integer-coercible port', () => {
+test('game server entries require truthy name, type, host, and a valid integer port', () => {
   const invalidEntries = [
     { type: 'steam', host: '127.0.0.1', port: 27015 },
     { name: 'Server', host: '127.0.0.1', port: 27015 },
     { name: 'Server', type: 'steam', port: 27015 },
     { name: 'Server', type: 'steam', host: '127.0.0.1', port: 'not-a-port' },
     { name: 'Server', type: 'steam', host: '127.0.0.1', port: 27015.5 },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: 0 },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: -1 },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: 65536 },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: '' },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: ' 27015 ' },
+    { name: 'Server', type: 'steam', host: '127.0.0.1', port: true },
     null,
+    [],
   ];
 
   for (const entry of invalidEntries) {
     assert.throws(
       () => loadConfig({ GAME_SERVERS: JSON.stringify([entry]) }),
-      /GAME_SERVERS entry 1 must include name, type, host, and a numeric port/,
+      /GAME_SERVERS entry 1 must include name, type, host, and an integer port from 1 to 65535/,
     );
   }
+});
+
+test('game server port boundaries 1 and 65535 are accepted', () => {
+  const config = loadConfig({
+    GAME_SERVERS: JSON.stringify([
+      { name: 'Low', type: 'steam', host: '127.0.0.1', port: 1 },
+      { name: 'High', type: 'steam', host: '127.0.0.1', port: 65535 },
+    ]),
+  });
+  assert.equal(config.gameServers.length, 2);
 });

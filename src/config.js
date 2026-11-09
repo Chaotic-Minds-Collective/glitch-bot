@@ -1,8 +1,8 @@
 require('dotenv').config();
 
 /**
- * Parse and validate the configured game-server entries.
- * @returns {Array<{name: *, type: *, host: *, port: *}>} Parsed entries. The name, type, and host fields must be truthy, and Number(port) must be an integer. Original field values are returned unchanged; their types are not normalized.
+ * Parse and validate configured game-server entries.
+ * @returns {Array<{name: *, type: *, host: *, port: *}>} Valid entries, preserving field values.
  * @throws {Error} If GAME_SERVERS is invalid JSON, is not an array, or contains an invalid entry.
  */
 function loadGameServers() {
@@ -15,8 +15,13 @@ function loadGameServers() {
   }
   if (!Array.isArray(parsed)) throw new Error('GAME_SERVERS must be a JSON array.');
   for (const [index, server] of parsed.entries()) {
-    if (!server || typeof server !== 'object' || !server.name || !server.type || !server.host || !Number.isInteger(Number(server.port))) {
-      throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and a numeric port.`);
+    const portIsNumeric = typeof server?.port === 'number'
+      || (typeof server?.port === 'string' && /^\d+$/.test(server.port));
+    const port = portIsNumeric ? Number(server.port) : NaN;
+    const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
+    if (!server || typeof server !== 'object' || Array.isArray(server)
+      || !server.name || !server.type || !server.host || !validPort) {
+      throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and an integer port from 1 to 65535.`);
     }
   }
   return parsed;
