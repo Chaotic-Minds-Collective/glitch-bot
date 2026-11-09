@@ -32,7 +32,7 @@ async function authorizeMemberAction(interaction, target) {
   if (target.id === interaction.user.id) return reject(interaction, 'You cannot use this command on yourself.');
   if (target.id === interaction.guild.ownerId) return reject(interaction, 'The server owner cannot be targeted by this command.');
 
-  const invoker = interaction.member;
+  const invoker = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const botMember = interaction.guild.members.me;
   const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
   if (!isGuildOwner && invoker?.roles?.highest && target.roles?.highest
@@ -74,7 +74,7 @@ function logStatus(success) {
   return success ? 'Logged.' : 'Warning: the moderation log could not be delivered.';
 }
 
-module.exports = [
+const moderationCommands = [
   {
     data: new SlashCommandBuilder()
       .setName('warn')
@@ -176,4 +176,7 @@ module.exports = [
       await interaction.reply({ content: `Purged ${deleted.size} messages. ${logStatus(logged)}`, ephemeral: true });
     },
   },
-];
+ ];
+
+moderationCommands.helpers = { hasStaffAccess, authorizeMemberAction };
+module.exports = moderationCommands;
