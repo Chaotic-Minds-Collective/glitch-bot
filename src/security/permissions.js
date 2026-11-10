@@ -35,7 +35,7 @@ async function requireStaff(interaction, action = 'use this control') {
 }
 
 function ticketOwnerId(channel) {
-  const match = String(channel?.topic || '').match(/(?:^|\\s)ticket-owner:(\\d{17,20})(?:\\s|$)/);
+  const match = String(channel?.topic || '').match(/(?:^|\s)ticket-owner:(\d{17,20})(?:\s|$)/);
   return match ? match[1] : null;
 }
 
