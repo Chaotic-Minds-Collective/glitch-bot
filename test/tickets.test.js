@@ -11,6 +11,7 @@ process.env.ROLE_STAFF = 'staff-role';
 process.env.ROLE_MODERATOR = 'moderator-role';
 
 const {
+  handleTicket,
   acquireTicketCreationLock,
   releaseTicketCreationLock,
   buildTicketPermissionOverwrites,
@@ -92,4 +93,59 @@ test('ticket close authorization still permits configured staff in a valid ticke
     member: { roles: { cache: new Map([['staff-role', {}]]) } },
   };
   assert.equal(canCloseTicket(interaction, ticketChannel()), true);
+});
+
+test('failed initial ticket message triggers cleanup of the newly created channel', async () => {
+  const errors = [];
+  const originalError = console.error;
+  console.error = (...args) => errors.push(args);
+  let deleted = false;
+  let sent = false;
+  let reply;
+  const channel = {
+    id: 'created-ticket',
+    async send() {
+      sent = true;
+      throw new Error('simulated send failure');
+    },
+    async delete() {
+      deleted = true;
+    },
+    toString() {
+      return '<#created-ticket>';
+    },
+  };
+  const guild = {
+    id: 'guild-cleanup',
+    roles: { everyone: { id: 'everyone' } },
+    members: { me: { permissions: { has: (permission) => permission === PermissionFlagsBits.ManageChannels } } },
+    channels: {
+      async fetch() { return []; },
+      async create() { return channel; },
+    },
+  };
+  const interaction = {
+    guild,
+    user: { id: '323456789012345678', username: 'Test User', tag: 'Test User#0001' },
+    client: { user: { id: 'bot-user' } },
+    customId: 'ticket_reason',
+    inGuild: () => true,
+    isButton: () => false,
+    isModalSubmit: () => true,
+    fields: { getTextInputValue: () => 'Need help' },
+    async reply(payload) { reply = payload; },
+    deferred: false,
+    replied: false,
+  };
+
+  try {
+    await handleTicket(interaction);
+    assert.equal(sent, true);
+    assert.equal(deleted, true);
+    assert.match(reply.content, /could not finish creating/i);
+    assert.equal(acquireTicketCreationLock(guild.id, interaction.user.id), true);
+    releaseTicketCreationLock(guild.id, interaction.user.id);
+  } finally {
+    console.error = originalError;
+  }
 });
