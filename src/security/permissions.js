@@ -1,4 +1,4 @@
-const { MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { ChannelType, MessageFlags, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 
 function isOwner(userId) {
@@ -35,14 +35,30 @@ async function requireStaff(interaction, action = 'use this control') {
 }
 
 function ticketOwnerId(channel) {
-  const match = String(channel?.topic || '').match(/(?:^|\s)ticket-owner:(\d{17,20})(?:\s|$)/);
+  const match = String(channel?.topic || '').match(/(?:^|\\s)ticket-owner:(\\d{17,20})(?:\\s|$)/);
   return match ? match[1] : null;
 }
 
+/**
+ * Confirm that a channel is a text ticket in the configured ticket category.
+ * This prevents a matching topic marker in an unrelated channel from being
+ * treated as a bot-created support ticket.
+ * @param {import('discord.js').GuildChannel|null} channel Candidate channel.
+ * @returns {boolean} Whether the channel belongs to the ticket area.
+ */
+function isTicketChannel(channel) {
+  return Boolean(channel?.type === ChannelType.GuildText &&
+    (channel.parentId ?? null) === (config.channels.tickets || null));
+}
+
 function canCloseTicket(interaction, channel) {
+  if (!isTicketChannel(channel)) return false;
   const ownerId = ticketOwnerId(channel);
   return Boolean(ownerId && interaction?.user?.id &&
     (interaction.user.id === ownerId || hasStaffAccess(interaction)));
 }
 
-module.exports = { isOwner, hasStaffAccess, requireStaff, replyEphemeral, ticketOwnerId, canCloseTicket };
+module.exports = {
+  isOwner, hasStaffAccess, requireStaff, replyEphemeral,
+  ticketOwnerId, isTicketChannel, canCloseTicket,
+};
