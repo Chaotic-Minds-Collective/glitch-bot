@@ -17,3 +17,9 @@ See [the onboarding setup guide](docs/ONBOARDING_SETUP.md) for the required Disc
 5. Run `npm start`.
 
 Never commit `.env`, bot tokens, or other secrets.
+
+## Chaotic Gaming Core integration
+
+Set CORE_API_URL to the public base URL of Chaotic Gaming Core to enable its readiness check and shared server registry. When Core is available and has listed servers, Glitch uses that registry for status announcements. If Core is not configured, unavailable, or has no listed servers, Glitch falls back to the existing GAME_SERVERS configuration and Gamedig queries.
+
+The integration is optional and read-only. Core outages do not stop the bot's Discord features. No Core database credentials or service token are required for the public readiness and server-list endpoints.
