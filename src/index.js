@@ -33,6 +33,7 @@ client.on('guildMemberRemove', (m) => events.guildMemberRemove.execute(client, m
 // Optional Core health check. Core outages never block independent Discord features.
 const coreApi = createCoreApiClient(config.coreApi);
 client.once('ready', async () => {
+  if (!coreApi) return;
   const result = await coreApi.checkHealth();
   if (!result.configured) return;
   if (result.available) console.info('[Core] Chaotic Gaming Core is reachable.');

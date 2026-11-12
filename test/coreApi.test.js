@@ -2,10 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { CoreApiError, createCoreApiClient } = require("../src/services/coreApi");
 
-test("Core client fails closed when no service credential is configured", async () => {
+test("Core client fails closed for writes when no service credential is configured", async () => {
   const client = createCoreApiClient({ baseUrl: "https://core.example.test", serviceToken: "" });
   await assert.rejects(
-    client.request("/health/live"),
+    client.sendServerHeartbeat("server-123", { online: true }),
     (error) => error instanceof CoreApiError && error.code === "CORE_NOT_CONFIGURED"
   );
 });
@@ -33,7 +33,7 @@ test("Core client sends authenticated heartbeat with JSON payload", async () => 
 
   assert.equal(result.data.accepted, true);
   assert.equal(observed.url, "https://core.example.test/integrations/servers/server-123/heartbeat");
-  assert.equal(observed.options.headers.Authorization, "Bearer cg_srv_test-token");
+  assert.equal(observed.options.headers.authorization, "Bearer cg_srv_test-token");
   assert.equal(JSON.parse(observed.options.body).game, "7dtd");
 });
 
@@ -78,8 +78,9 @@ test("Core request cannot override its service bearer credential", async () => {
       return new Response(null, { status: 204 });
     },
   });
-  await client.request("/private", { headers: { Authorization: "Bearer attacker-token" } });
-  assert.equal(observedHeaders.Authorization, "Bearer trusted-token");
+  await client.request("/private", { headers: { Authorization: "Bearer attacker-token", AUTHORIZATION: "Bearer other", "x-test": "preserved" } });
+  assert.equal(new Headers(observedHeaders).get("authorization"), "Bearer trusted-token");
+  assert.equal(new Headers(observedHeaders).get("x-test"), "preserved");
 });
 
 
