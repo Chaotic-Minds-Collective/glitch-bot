@@ -1,22 +1,44 @@
 const { EmbedBuilder } = require('discord.js');
 const { queryServer } = require('./serverQuery');
+const { createCoreApiClient } = require('../services/coreApi');
 const config = require('../config');
 
-// Every 2 minutes: query each game server; post an update in #server-status only on change.
+const coreApi = createCoreApiClient({ baseUrl: config.coreApiUrl });
 const state = new Map();
+let lastCoreWarningAt = 0;
 
-/**
- * Poll all configured game servers and post a status embed on any change.
- * @param {import('discord.js').Client} client - logged-in Discord client
- */
+async function getServerResults() {
+  if (coreApi) {
+    try {
+      const servers = await coreApi.getServers();
+      if (servers.length > 0) return servers;
+    } catch (error) {
+      if (Date.now() - lastCoreWarningAt > 15 * 60 * 1000) {
+        console.warn('[Core API] Server catalog unavailable; falling back to local GameDig configuration:', error.message);
+        lastCoreWarningAt = Date.now();
+      }
+    }
+  }
+
+  // Preserve current behavior when Core is not configured, offline, or has no
+  // production-listed servers yet. The bot remains useful independently.
+  return Promise.all(config.gameServers.map(queryServer));
+}
+
+// Every 2 minutes: prefer the canonical Core catalog; fall back to GameDig.
 async function check(client) {
-  if (!config.channels.serverStatus || !config.gameServers.length) return;
-  const results = await Promise.all(config.gameServers.map(queryServer));
-  const key = results.map((r) => `${r.name}:${r.online ? r.players : 'x'}`).join('|');
-  if (state.has(key)) return; // no change
-  state.clear(); state.set(key, true);
+  if (!config.channels.serverStatus) return;
+  const results = await getServerResults();
+  if (!results.length) return;
+
+  const key = results.map((r) => `${r.id || r.name}:${r.online ? r.players : 'x'}`).join('|');
+  if (state.has(key)) return;
+  state.clear();
+  state.set(key, true);
+
   const ch = client.channels.cache.get(config.channels.serverStatus);
   if (!ch) return;
+
   const lines = results.map((r) => r.online
     ? `:large_blue_circle: **${r.name}** - ONLINE - ${r.players}/${r.maxPlayers} players${r.map ? ` - ${r.map}` : ''}`
     : `:red_circle: **${r.name}** - OFFLINE`);
@@ -31,7 +53,9 @@ async function check(client) {
  */
 async function monitorLoop(client) {
   await check(client);
-  setInterval(() => check(client), 2 * 60 * 1000);
+  setInterval(() => check(client).catch((error) => {
+    console.error('[Server Status] Monitor cycle failed:', error.message);
+  }), 2 * 60 * 1000);
 }
 
-module.exports = { monitorLoop };
+module.exports = { monitorLoop, getServerResults };
