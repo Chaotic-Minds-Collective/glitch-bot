@@ -3,33 +3,67 @@ const { queryServer } = require('./serverQuery');
 const { createCoreApiClient } = require('../services/coreApi');
 const config = require('../config');
 
-const coreApi = createCoreApiClient({ baseUrl: config.coreApiUrl });
-let lastChangeKey;
+const state = new Map();
+let coreApiClient;
 let lastCoreWarningAt = 0;
 
-async function getServerResults() {
-  if (coreApi) {
+function getCoreApiClient() {
+  if (!process.env.CORE_API_BASE_URL || !process.env.CORE_API_SERVICE_TOKEN) return null;
+  if (!coreApiClient) coreApiClient = createCoreApiClient();
+  return coreApiClient;
+}
+
+function getCoreGameKey(type) {
+  if (type === 'atlas') return 'atlas';
+  if (type === '7d2d') return '7dtd';
+  if (type === 'ark') return 'ark';
+  return null;
+}
+
+async function reportCoreHeartbeats(results) {
+  let api;
+  try {
+    api = getCoreApiClient();
+  } catch (error) {
+    if (Date.now() - lastCoreWarningAt > 5 * 60 * 1000) {
+      console.warn('[Core] Invalid Core API configuration:', error.code || 'CONFIGURATION_ERROR');
+      lastCoreWarningAt = Date.now();
+    }
+    return;
+  }
+  if (!api) return;
+
+  await Promise.all(results.filter((server) => server.coreServerId).map(async (server) => {
+    const game = getCoreGameKey(server.type);
+    if (!game) return;
     try {
-      const servers = await coreApi.getServers();
-      if (servers.length > 0) return servers;
+      await api.sendServerHeartbeat(server.coreServerId, {
+        game,
+        serverVersion: server.serverVersion || 'unknown',
+        adapterVersion: process.env.CORE_API_ADAPTER_VERSION || 'glitch-bot/1.0.0',
+        online: server.online,
+        playerCount: server.online ? server.players : 0,
+        observedAt: new Date().toISOString(),
+      });
     } catch (error) {
-      if (Date.now() - lastCoreWarningAt > 15 * 60 * 1000) {
-        console.warn('[Core API] Server catalog unavailable; falling back to local GameDig configuration:', error.message);
+      if (Date.now() - lastCoreWarningAt > 5 * 60 * 1000) {
+        console.warn('[Core] Server heartbeat could not be delivered:', error.code || 'REQUEST_FAILED');
         lastCoreWarningAt = Date.now();
       }
     }
-  }
-
-  // Preserve current behavior when Core is not configured, offline, or has no
-  // production-listed servers yet. The bot remains useful independently.
-  return Promise.all(config.gameServers.map(queryServer));
+  }));
 }
 
-// Every 2 minutes: prefer the canonical Core catalog; fall back to GameDig.
 async function check(client) {
+  if (!config.gameServers.length) return;
+  const results = await Promise.all(config.gameServers.map(queryServer));
+  await reportCoreHeartbeats(results);
+
   if (!config.channels.serverStatus) return;
-  const results = await getServerResults();
-  if (!results.length) return;
+  const key = results.map((r) => `${r.name}:${r.online ? r.players : 'x'}`).join('|');
+  if (state.has(key)) return;
+  state.clear();
+  state.set(key, true);
 
   const ch = client.channels.cache.get(config.channels.serverStatus);
   if (!ch) return;
@@ -51,10 +85,6 @@ async function check(client) {
   lastChangeKey = changeKey;
 }
 
-/**
- * Start the recurring status monitor loop (first check + every 2 minutes).
- * @param {import('discord.js').Client} client - logged-in Discord client
- */
 async function monitorLoop(client) {
   const runCheck = () => check(client).catch((error) => {
     console.error('[Server Status] Monitor cycle failed:', error.message);
@@ -63,4 +93,4 @@ async function monitorLoop(client) {
   setInterval(runCheck, 2 * 60 * 1000);
 }
 
-module.exports = { monitorLoop, getServerResults };
+module.exports = { monitorLoop, getCoreGameKey };

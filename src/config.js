@@ -23,13 +23,39 @@ function loadGameServers() {
       || !server.name || !server.type || !server.host || !validPort) {
       throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and an integer port from 1 to 65535.`);
     }
+    if (server.coreServerId !== undefined
+      && (typeof server.coreServerId !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(server.coreServerId))) {
+      throw new Error(`GAME_SERVERS entry ${index + 1} coreServerId must be a valid UUID when provided.`);
+    }
+    if (server.serverVersion !== undefined
+      && (typeof server.serverVersion !== 'string' || !server.serverVersion.trim() || server.serverVersion.length > 100)) {
+      throw new Error(`GAME_SERVERS entry ${index + 1} serverVersion must be a non-empty string of at most 100 characters.`);
+    }
   }
   return parsed;
 }
 
-const coreApiUrl = process.env.CORE_API_URL?.trim() || null;
-if (coreApiUrl && process.env.NODE_ENV === 'production' && !coreApiUrl.startsWith('https://')) {
-  throw new Error('CORE_API_URL must use HTTPS in production.');
+const coreApiBaseUrl = process.env.CORE_API_BASE_URL || null;
+const coreApiServiceToken = process.env.CORE_API_SERVICE_TOKEN || null;
+if (coreApiServiceToken && !coreApiBaseUrl) {
+  throw new Error('CORE_API_BASE_URL is required when CORE_API_SERVICE_TOKEN is configured.');
+}
+if (coreApiBaseUrl) {
+  let parsedCoreApiUrl;
+  try {
+    parsedCoreApiUrl = new URL(coreApiBaseUrl);
+  } catch {
+    throw new Error('CORE_API_BASE_URL must be a valid absolute URL.');
+  }
+  if (!['http:', 'https:'].includes(parsedCoreApiUrl.protocol)) {
+    throw new Error('CORE_API_BASE_URL must use HTTP or HTTPS.');
+  }
+  const localHosts = ['localhost', '127.0.0.1', '[::1]'];
+  if (coreApiServiceToken && parsedCoreApiUrl.protocol !== 'https:'
+    && !localHosts.includes(parsedCoreApiUrl.hostname)) {
+    throw new Error('CORE_API_SERVICE_TOKEN requires HTTPS except for loopback development URLs.');
+  }
 }
 
 const config = {
@@ -37,7 +63,11 @@ const config = {
   ownerId: process.env.OWNER_ID || null,
   guildId: process.env.GUILD_ID,
   clientId: process.env.CLIENT_ID,
-  coreApiUrl,
+  coreApi: {
+    baseUrl: coreApiBaseUrl,
+    serviceToken: coreApiServiceToken,
+    timeoutMs: 5000,
+  },
   channels: {
     rules: process.env.CHANNEL_RULES,
     welcome: process.env.CHANNEL_WELCOME,
