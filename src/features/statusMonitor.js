@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { queryServer } = require('./serverQuery');
-const { createCoreApiClient } = require('./coreApi');
+const { createCoreApiClient } = require('../services/coreApi');
 const config = require('../config');
 
 const state = new Map();
@@ -17,7 +17,7 @@ function getCoreGameKey(type) {
   if (type === 'atlas') return 'atlas';
   if (type === '7d2d') return '7dtd';
   if (type === 'ark') return 'ark';
-  return null; // ARK: Survival Ascended is intentionally not mapped to the ASE schema.
+  return null;
 }
 
 async function reportCoreHeartbeats(results) {
@@ -54,11 +54,6 @@ async function reportCoreHeartbeats(results) {
   }));
 }
 
-/**
- * Poll configured game servers and report optional Core heartbeats.
- * Core integration is disabled unless both server-side environment values are present.
- * @param {import('discord.js').Client} client - logged-in Discord client
- */
 async function check(client) {
   if (!config.gameServers.length) return;
   const results = await Promise.all(config.gameServers.map(queryServer));
@@ -80,10 +75,6 @@ async function check(client) {
   await ch.send({ embeds: [embed] }).catch(() => {});
 }
 
-/**
- * Start the recurring status monitor loop (first check + every 2 minutes).
- * @param {import('discord.js').Client} client - logged-in Discord client
- */
 async function monitorLoop(client) {
   await check(client);
   setInterval(() => check(client), 2 * 60 * 1000);
