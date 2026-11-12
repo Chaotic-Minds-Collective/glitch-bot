@@ -11,31 +11,25 @@ function loadGameServers() {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(\`GAME_SERVERS must contain valid JSON: \${error.message}\`);
+    throw new Error(`GAME_SERVERS must contain valid JSON: ${error.message}`);
   }
   if (!Array.isArray(parsed)) throw new Error('GAME_SERVERS must be a JSON array.');
   for (const [index, server] of parsed.entries()) {
     const portIsNumeric = typeof server?.port === 'number'
-      || (typeof server?.port === 'string' && /^\\d+$/.test(server.port));
+      || (typeof server?.port === 'string' && /^\d+$/.test(server.port));
     const port = portIsNumeric ? Number(server.port) : NaN;
     const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
     if (!server || typeof server !== 'object' || Array.isArray(server)
       || !server.name || !server.type || !server.host || !validPort) {
-      throw new Error(\`GAME_SERVERS entry \${index + 1} must include name, type, host, and an integer port from 1 to 65535.\`);
+      throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and an integer port from 1 to 65535.`);
     }
   }
   return parsed;
 }
 
 const coreApiUrl = process.env.CORE_API_URL?.trim() || null;
-if (coreApiUrl) {
-  const parsedCoreUrl = new URL(coreApiUrl);
-  if (!['http:', 'https:'].includes(parsedCoreUrl.protocol)) {
-    throw new Error('CORE_API_URL must use HTTP or HTTPS.');
-  }
-  if (process.env.NODE_ENV === 'production' && parsedCoreUrl.protocol !== 'https:') {
-    throw new Error('CORE_API_URL must use HTTPS in production.');
-  }
+if (coreApiUrl && process.env.NODE_ENV === 'production' && !coreApiUrl.startsWith('https://')) {
+  throw new Error('CORE_API_URL must use HTTPS in production.');
 }
 
 const config = {
