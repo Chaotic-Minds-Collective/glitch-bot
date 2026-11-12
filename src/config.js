@@ -16,7 +16,7 @@ function loadGameServers() {
   if (!Array.isArray(parsed)) throw new Error('GAME_SERVERS must be a JSON array.');
   for (const [index, server] of parsed.entries()) {
     const portIsNumeric = typeof server?.port === 'number'
-      || (typeof server?.port === 'string' && /^\\d+$/.test(server.port));
+      || (typeof server?.port === 'string' && /^\d+$/.test(server.port));
     const port = portIsNumeric ? Number(server.port) : NaN;
     const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
     if (!server || typeof server !== 'object' || Array.isArray(server)
