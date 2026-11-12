@@ -1,6 +1,6 @@
 const DEFAULT_TIMEOUT_MS = 5_000;
 
-export class CoreApiError extends Error {
+class CoreApiError extends Error {
   constructor(message, { status = 0, code = "CORE_API_ERROR" } = {}) {
     super(message);
     this.name = "CoreApiError";
@@ -9,7 +9,7 @@ export class CoreApiError extends Error {
   }
 }
 
-export function createCoreApiClient({
+function createCoreApiClient({
   baseUrl = process.env.CORE_API_BASE_URL,
   serviceToken = process.env.CORE_API_SERVICE_TOKEN,
   fetchImpl = globalThis.fetch,
