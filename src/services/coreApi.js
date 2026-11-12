@@ -1,83 +1,114 @@
+const DEFAULT_TIMEOUT_MS = 5_000;
+
 class CoreApiError extends Error {
-  constructor(message, status = null) {
+  constructor(message, { status = 0, code = "CORE_API_ERROR" } = {}) {
     super(message);
-    this.name = 'CoreApiError';
+    this.name = "CoreApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
-class CoreApiClient {
-  constructor(config, fetchImpl = globalThis.fetch) {
-    this.baseUrl = config.baseUrl ? new URL(config.baseUrl) : null;
-    this.serviceToken = config.serviceToken || null;
-    this.timeoutMs = config.timeoutMs || 5000;
-    this.fetchImpl = fetchImpl;
-  }
+function createCoreApiClient({
+  baseUrl = process.env.CORE_API_BASE_URL,
+  serviceToken = process.env.CORE_API_SERVICE_TOKEN,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+} = {}) {
+  const configuredUrl = typeof baseUrl === "string" ? baseUrl.trim() : "";
+  const token = typeof serviceToken === "string" ? serviceToken.trim() : "";
+  let origin = null;
 
-  get configured() {
-    return Boolean(this.baseUrl);
-  }
-
-  async checkHealth() {
-    if (!this.configured) return { configured: false, available: false };
-
+  if (configuredUrl) {
     try {
-      const response = await this.fetchImpl(new URL('/health/live', this.baseUrl), {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(this.timeoutMs),
+      const parsed = new URL(configuredUrl);
+      const localHttp = parsed.protocol === "http:"
+        && ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+      if (parsed.protocol !== "https:" && !localHttp) {
+        throw new Error("Core API URL must use HTTPS outside loopback development.");
+      }
+      origin = parsed.origin;
+    } catch (error) {
+      throw new CoreApiError(error.message, { code: "INVALID_CORE_API_URL" });
+    }
+  }
+
+  async function request(path, { method = "GET", body, headers = {} } = {}) {
+    if (!origin || !token) {
+      throw new CoreApiError("Core API integration is not configured.", { code: "CORE_NOT_CONFIGURED" });
+    }
+    if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
+      throw new CoreApiError("Core API path must be an absolute local path.", { code: "INVALID_PATH" });
+    }
+
+    const url = new URL(path, origin);
+    if (url.origin !== origin) {
+      throw new CoreApiError("Core API path escaped the configured origin.", { code: "INVALID_PATH" });
+    }
+
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        method,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...headers,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(timeoutMs),
       });
-      if (!response.ok) return { configured: true, available: false };
-      return { configured: true, available: true };
     } catch {
-      // Core availability must never prevent the independent Discord bot from starting.
+      throw new CoreApiError("Core API request failed or timed out.", { code: "CORE_REQUEST_FAILED" });
+    }
+
+    const text = await response.text();
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new CoreApiError("Core API returned invalid JSON.", {
+          status: response.status,
+          code: "INVALID_CORE_RESPONSE",
+        });
+      }
+    }
+
+    if (!response.ok) {
+      throw new CoreApiError(payload?.error?.message || `Core API request failed (${response.status}).`, {
+        status: response.status,
+        code: payload?.error?.code || "CORE_REQUEST_FAILED",
+      });
+    }
+    return payload;
+  }
+
+  async function checkHealth() {
+    if (!origin) return { configured: false, available: false };
+    try {
+      const response = await fetchImpl(new URL("/health/live", origin), {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return { configured: true, available: response.ok };
+    } catch {
       return { configured: true, available: false };
     }
   }
 
-  async request(path, options = {}) {
-    if (!this.configured) throw new CoreApiError('Chaotic Gaming Core is not configured.');
-    if (!this.serviceToken) throw new CoreApiError('Core service credentials are not configured.');
-    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {
-      throw new CoreApiError('Core API paths must be absolute paths on the configured origin.');
-    }
-
-    const url = new URL(path, this.baseUrl);
-    if (url.origin !== this.baseUrl.origin) {
-      throw new CoreApiError('Core API path escaped the configured origin.');
-    }
-
-    const headers = new Headers(options.headers || {});
-    headers.set('Accept', 'application/json');
-    headers.set('Authorization', `Bearer ${this.serviceToken}`);
-
-    let body;
-    if (options.body !== undefined) {
-      headers.set('Content-Type', 'application/json');
-      body = JSON.stringify(options.body);
-    }
-
-    const timeout = AbortSignal.timeout(this.timeoutMs);
-    const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-
-    let response;
-    try {
-      response = await this.fetchImpl(url, {
-        method: options.method || 'GET',
-        headers,
-        ...(body === undefined ? {} : { body }),
-        signal,
+  return Object.freeze({
+    request,
+    checkHealth,
+    sendServerHeartbeat(serverId, heartbeat) {
+      return request(`/integrations/servers/${encodeURIComponent(serverId)}/heartbeat`, {
+        method: "POST",
+        body: heartbeat,
       });
-    } catch {
-      throw new CoreApiError('Chaotic Gaming Core request failed or timed out.');
-    }
-
-    if (!response.ok) {
-      throw new CoreApiError(`Chaotic Gaming Core returned HTTP ${response.status}.`, response.status);
-    }
-    if (response.status === 204) return null;
-    return response.json();
-  }
+    },
+  });
 }
 
-module.exports = { CoreApiClient, CoreApiError };
+module.exports = { CoreApiError, createCoreApiClient };

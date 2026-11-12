@@ -143,3 +143,31 @@ test('Core API service token requires a configured base URL', () => {
   );
 });
 
+
+test('GAME_SERVERS accepts a valid Core server UUID mapping', () => {
+  const config = loadConfig({
+    GAME_SERVERS: JSON.stringify([
+      {
+        name: 'Server',
+        type: '7d2d',
+        host: '127.0.0.1',
+        port: 26900,
+        coreServerId: '123e4567-e89b-42d3-a456-426614174000',
+        serverVersion: '3.4.0',
+      },
+    ]),
+  });
+  assert.equal(config.gameServers[0].coreServerId, '123e4567-e89b-42d3-a456-426614174000');
+});
+
+test('GAME_SERVERS rejects invalid Core server UUID mappings', () => {
+  assert.throws(
+    () => loadConfig({
+      GAME_SERVERS: JSON.stringify([
+        { name: 'Server', type: '7d2d', host: '127.0.0.1', port: 26900, coreServerId: 'not-a-uuid' },
+      ]),
+    }),
+    /coreServerId must be a valid UUID/,
+  );
+});
+

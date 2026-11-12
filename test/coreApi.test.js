@@ -58,3 +58,12 @@ test("Core client rejects non-success responses without exposing credentials", a
     (error) => error.status === 403 && error.code === "FORBIDDEN" && !error.message.includes("secret-value")
   );
 });
+
+test("Core health check does not require a service credential and fails non-fatally", async () => {
+  const client = createCoreApiClient({
+    baseUrl: "https://core.example.test",
+    serviceToken: "",
+    fetchImpl: async () => new Response(null, { status: 200 }),
+  });
+  assert.deepEqual(await client.checkHealth(), { configured: true, available: true });
+});

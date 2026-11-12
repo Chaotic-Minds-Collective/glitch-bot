@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const config = require('./config');
-const { CoreApiClient } = require('./services/coreApi');
+const { createCoreApiClient } = require('./services/coreApi');
 
 const client = new Client({
   intents: [
@@ -30,8 +30,8 @@ client.on('interactionCreate', (i) => events.interactionCreate.execute(client, i
 client.on('guildMemberAdd', (m) => events.guildMemberAdd.execute(client, m));
 client.on('guildMemberRemove', (m) => events.guildMemberRemove.execute(client, m));
 
-// Optional Core health integration. A Core outage must not take Glitch offline.
-const coreApi = new CoreApiClient(config.coreApi);
+// Optional Core health check. Core outages never block independent Discord features.
+const coreApi = createCoreApiClient(config.coreApi);
 client.once('ready', async () => {
   const result = await coreApi.checkHealth();
   if (!result.configured) return;
@@ -39,7 +39,7 @@ client.once('ready', async () => {
   else console.warn('[Core] Chaotic Gaming Core is unavailable; independent bot features remain active.');
 });
 
-// Status monitor: check game servers every 2 minutes
+// Status monitor: check game servers every 2 minutes and report configured server heartbeats to Core.
 const { monitorLoop } = require('./features/statusMonitor');
 client.once('ready', () => monitorLoop(client));
 
