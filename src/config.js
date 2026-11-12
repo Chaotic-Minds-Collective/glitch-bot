@@ -51,7 +51,7 @@ if (coreApiBaseUrl) {
   if (!['http:', 'https:'].includes(parsedCoreApiUrl.protocol)) {
     throw new Error('CORE_API_BASE_URL must use HTTP or HTTPS.');
   }
-  const localHosts = ['localhost', '127.0.0.1', '::1'];
+  const localHosts = ['localhost', '127.0.0.1', '[::1]'];
   if (coreApiServiceToken && parsedCoreApiUrl.protocol !== 'https:'
     && !localHosts.includes(parsedCoreApiUrl.hostname)) {
     throw new Error('CORE_API_SERVICE_TOKEN requires HTTPS except for loopback development URLs.');

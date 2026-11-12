@@ -23,7 +23,7 @@ function createCoreApiClient({
     try {
       const parsed = new URL(configuredUrl);
       const localHttp = parsed.protocol === "http:"
-        && ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+        && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
       if (parsed.protocol !== "https:" && !localHttp) {
         throw new Error("Core API URL must use HTTPS outside loopback development.");
       }
@@ -69,10 +69,12 @@ function createCoreApiClient({
       try {
         payload = JSON.parse(text);
       } catch {
-        throw new CoreApiError("Core API returned invalid JSON.", {
-          status: response.status,
-          code: "INVALID_CORE_RESPONSE",
-        });
+        if (response.ok) {
+          throw new CoreApiError("Core API returned invalid JSON.", {
+            status: response.status,
+            code: "INVALID_CORE_RESPONSE",
+          });
+        }
       }
     }
 

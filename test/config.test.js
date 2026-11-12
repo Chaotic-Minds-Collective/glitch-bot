@@ -167,3 +167,16 @@ test('GAME_SERVERS rejects invalid Core server UUID mappings', () => {
     /coreServerId must be a valid UUID/,
   );
 });
+
+
+test('Core API permits IPv6 loopback HTTP but rejects remote IPv6 HTTP', () => {
+  const config = loadConfig({
+    CORE_API_BASE_URL: 'http://[::1]:4100',
+    CORE_API_SERVICE_TOKEN: 'test-service-token',
+  });
+  assert.equal(config.coreApi.baseUrl, 'http://[::1]:4100');
+  assert.throws(() => loadConfig({
+    CORE_API_BASE_URL: 'http://[2001:db8::1]:4100',
+    CORE_API_SERVICE_TOKEN: 'test-service-token',
+  }), /requires HTTPS/);
+});

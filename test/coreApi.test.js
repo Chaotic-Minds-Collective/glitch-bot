@@ -81,3 +81,45 @@ test("Core request cannot override its service bearer credential", async () => {
   await client.request("/private", { headers: { Authorization: "Bearer attacker-token" } });
   assert.equal(observedHeaders.Authorization, "Bearer trusted-token");
 });
+
+
+test("Core client accepts IPv6 loopback HTTP without allowing remote HTTP", async () => {
+  let observedUrl;
+  const client = createCoreApiClient({
+    baseUrl: "http://[::1]:4100",
+    serviceToken: "test-token",
+    fetchImpl: async (url) => {
+      observedUrl = String(url);
+      return new Response(null, { status: 204 });
+    },
+  });
+  await client.request("/private");
+  assert.equal(observedUrl, "http://[::1]:4100/private");
+  assert.deepEqual(await client.checkHealth(), { configured: true, available: true });
+  assert.equal(observedUrl, "http://[::1]:4100/health/live");
+  assert.throws(() => createCoreApiClient({ baseUrl: "http://[2001:db8::1]" }),
+    (error) => error.code === "INVALID_CORE_API_URL");
+});
+
+test("Core client preserves HTTP failures for non-JSON responses", async () => {
+  for (const status of [401, 403, 502]) {
+    const client = createCoreApiClient({
+      baseUrl: "https://core.example.test",
+      serviceToken: "test-token",
+      fetchImpl: async () => new Response("<html>upstream error</html>", { status }),
+    });
+    await assert.rejects(client.request("/private"), (error) =>
+      error.status === status && error.code === "CORE_REQUEST_FAILED"
+        && error.message === `Core API request failed (${status}).`);
+  }
+});
+
+test("Core client still rejects invalid JSON in successful responses", async () => {
+  const client = createCoreApiClient({
+    baseUrl: "https://core.example.test",
+    serviceToken: "test-token",
+    fetchImpl: async () => new Response("not JSON", { status: 200 }),
+  });
+  await assert.rejects(client.request("/private"), (error) =>
+    error.status === 200 && error.code === "INVALID_CORE_RESPONSE");
+});
