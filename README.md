@@ -8,12 +8,25 @@ The member path is welcome → rules acceptance → verification → game select
 
 See [the onboarding setup guide](docs/ONBOARDING_SETUP.md) for the required Discord role, environment values, role hierarchy, and staff panel commands.
 
+## Chaotic Gaming Core integration
+
+Glitch remains an independent Discord application. When configured, it can check the Core API health endpoint and use a service-authenticated API client for Core-dependent operations.
+
+- Set `CORE_API_BASE_URL` to the Core API origin.
+- Set `CORE_API_SERVICE_TOKEN` only after a dedicated service credential has been provisioned by Core.
+- Use HTTPS except for loopback development.
+- Core outages must not prevent independent Discord features from starting.
+- Never place Core service credentials in Discord messages, commands, client bundles or source control.
+
+Core-dependent features remain disabled until the Core service credential and relevant API endpoints are implemented.
+
 ## Local development
 
-1. Install Node.js 20 or newer.
+1. Install Node.js 22 or newer.
 2. Run `npm install`.
 3. Copy `.env.example` to `.env` and fill in the bot token and server configuration.
-4. Run `npm run deploy` to register slash commands after reviewing the command set.
-5. Run `npm start`.
+4. Run `npm test`.
+5. Run `npm run deploy` to register slash commands after reviewing the command set.
+6. Run `npm start`.
 
-Never commit `.env`, bot tokens, or other secrets.
+Never commit `.env`, bot tokens, Core service tokens, or other secrets.
