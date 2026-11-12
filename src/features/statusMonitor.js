@@ -4,7 +4,7 @@ const { createCoreApiClient } = require('../services/coreApi');
 const config = require('../config');
 
 const coreApi = createCoreApiClient({ baseUrl: config.coreApiUrl });
-const state = new Map();
+let lastDescription;
 let lastCoreWarningAt = 0;
 
 async function getServerResults() {
@@ -31,20 +31,21 @@ async function check(client) {
   const results = await getServerResults();
   if (!results.length) return;
 
-  const key = results.map((r) => `${r.id || r.name}:${r.online ? r.players : 'x'}`).join('|');
-  if (state.has(key)) return;
-  state.clear();
-  state.set(key, true);
-
   const ch = client.channels.cache.get(config.channels.serverStatus);
   if (!ch) return;
 
   const lines = results.map((r) => r.online
-    ? `:large_blue_circle: **${r.name}** - ONLINE - ${r.players}/${r.maxPlayers} players${r.map ? ` - ${r.map}` : ''}`
-    : `:red_circle: **${r.name}** - OFFLINE`);
+    ? `:large_blue_circle: **${String(r.name).slice(0, 256)}** - ONLINE - ${r.players}/${r.maxPlayers} players${r.map ? ` - ${String(r.map).slice(0, 256)}` : ''}`
+    : `:red_circle: **${String(r.name).slice(0, 256)}** - OFFLINE`);
+  // Keep one embed within Discord's description and total text limits.
+  const text = lines.join('\n');
+  const description = text.length > 4096 ? `${text.slice(0, 4093)}...` : text;
+  if (description === lastDescription) return;
+
   const embed = new EmbedBuilder().setColor(config.colors.primary)
-    .setTitle('SERVER STATUS UPDATE').setDescription(lines.join('\n')).setTimestamp();
-  await ch.send({ embeds: [embed] }).catch(() => {});
+    .setTitle('SERVER STATUS UPDATE').setDescription(description).setTimestamp();
+  await ch.send({ embeds: [embed] });
+  lastDescription = description;
 }
 
 /**
@@ -52,10 +53,11 @@ async function check(client) {
  * @param {import('discord.js').Client} client - logged-in Discord client
  */
 async function monitorLoop(client) {
-  await check(client);
-  setInterval(() => check(client).catch((error) => {
+  const runCheck = () => check(client).catch((error) => {
     console.error('[Server Status] Monitor cycle failed:', error.message);
-  }), 2 * 60 * 1000);
+  });
+  await runCheck();
+  setInterval(runCheck, 2 * 60 * 1000);
 }
 
 module.exports = { monitorLoop, getServerResults };
