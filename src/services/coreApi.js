@@ -39,7 +39,6 @@ function createCoreApiClient({
     if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
       throw new CoreApiError("Core API path must be an absolute local path.", { code: "INVALID_PATH" });
     }
-
     const url = new URL(path, origin);
     if (url.origin !== origin) {
       throw new CoreApiError("Core API path escaped the configured origin.", { code: "INVALID_PATH" });
@@ -50,10 +49,15 @@ function createCoreApiClient({
       response = await fetchImpl(url, {
         method,
         headers: {
-          accept: "application/json",
           ...headers,
+          Accept: "application/json",
+          accept: "application/json",
+          Authorization: `Bearer ${token}`,
           authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
+          ...(body === undefined ? {} : {
+            "Content-Type": "application/json",
+            "content-type": "application/json",
+          }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -76,9 +80,8 @@ function createCoreApiClient({
         }
       }
     }
-
     if (!response.ok) {
-      throw new CoreApiError(payload?.error?.message || `Core API request failed (HTTP ${response.status}).`, {
+      throw new CoreApiError(payload?.error?.message || `Core API request failed (${response.status}).`, {
         status: response.status,
         code: payload?.error?.code || "CORE_REQUEST_FAILED",
       });
@@ -89,9 +92,7 @@ function createCoreApiClient({
   async function getServers() {
     const payload = await request("/servers");
     if (!Array.isArray(payload?.data)) {
-      throw new CoreApiError("Core API returned an invalid server catalog.", {
-        code: "INVALID_SERVER_CATALOG",
-      });
+      throw new CoreApiError("Core API returned an invalid server catalog.", { code: "INVALID_SERVER_CATALOG" });
     }
     return payload.data.map((server) => ({
       id: server.id,
@@ -108,11 +109,10 @@ function createCoreApiClient({
   }
 
   async function checkHealth() {
-    if (!origin) return { configured: false, available: false };
     try {
       const response = await fetchImpl(new URL("/health/live", origin), {
         method: "GET",
-        headers: { accept: "application/json" },
+        headers: { Accept: "application/json", accept: "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });
       return { configured: true, available: response.ok };

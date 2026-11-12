@@ -124,7 +124,7 @@ for (const scenario of ["unset URL", "empty catalog"]) {
       await h.tick();
       assert.deepEqual(h.queries, localServers);
       assert.equal(h.sent.length, 2);
-      assert.match(h.sent[1].description, /Alpha.*ONLINE.*1\\/10 players/);
+      assert.match(h.sent[1].description, /Alpha.*ONLINE.*1\/10 players/);
       await h.tick();
       assert.equal(h.sent.length, 2);
     }
@@ -144,29 +144,27 @@ test("Core failure falls back to GameDig results and the recurring cycle recover
   await h.start();
   assert.deepEqual(h.queries, [gameServer]);
   assert.equal(h.sent.length, 1);
-  assert.match(h.sent[0].description, /Local Alpha.*ONLINE.*3\\/20 players.*The Island/);
+  assert.match(h.sent[0].description, /Local Alpha.*ONLINE.*3\/20 players.*ÙH\Û[™ÊNÂ‚ˆ™˜Z[
+[
+NÂˆœ™\İ[ÊÜÙ\™\—JNÂˆ]ØZ]XÚÊ
+NÂˆ\ÜÙ\™Y\\]X[
+œ]Y\šY\ËÙØ[YTÙ\™\—JNÂˆ\ÜÙ\™\]X[
+œÙ[›[™İŠNÂˆ\ÜÙ\›X]Ú
+œÙ[ÌWK™\ØÜš\[Û‹Ğ[KŠ“Ó“S‘KŠŒWÌL^Y\œËÊNÂˆ]ØZ]XÚÊ
+NÂˆ\ÜÙ\™\]X[
+œÙ[›[™İŠNÂŸJNÂ‚\İ
+˜H›Û™[\HÛÜ™HØ][ÙÈZÙ\È™XÙY[˜ÙHİ™\ˆÛÛ™šYİ\™YØ[YQYÈÙ\™\œÈ‹\Ş[˜È
+
+HOˆÂˆÛÛœİH\›™\ÜÊÜÙ\™\—KÈØ[YTÙ\™\œÎˆØØ[Ù\™\œÈJNÂˆ]ØZ]œİ\
 
-  h.fail(null);
-  h.results([server]);
-  await h.tick();
-  assert.deepEqual(h.queries, [gameServer]);
-  assert.equal(h.sent.length, 2);
-  assert.match(h.sent[1].description, /Alpha.*ONLINE.*1\\/10 players/);
-  await h.tick();
-  assert.equal(h.sent.length, 2);
-});
+NÂˆ\ÜÙ\™Y\\]X[
+œ]Y\šY\Ë×JNÂˆ\ÜÙ\™\]X[
+œÙ[›[™İJNÂˆ\ÜÙ\›X]Ú
+œÙ[ÌK™\ØÜš\[Û‹Ğ[KŠ“Ó“S‘KŠŒWÌL^Y\œËÊNÂŸJNÂ‚\İ
+ÛÜ™HØ][ÙÈ\ÈX›\ÚY]™[ˆÚ[ˆ›ÈØØ[Ø[YQYÈÙ\™\œÈ\™HÛÛ™šYİ\™Y‹\Ş[˜È
+
+HOˆÂˆÛÛœİH\›™\ÜÊÜÙ\™\—JNÂˆ]ØZ]œİ\
 
-test("a nonempty Core catalog takes precedence over configured GameDig servers", async (t) => {
-  const h = harness(t, [server], { gameServers: localServers });
-  await h.start();
-  assert.deepEqual(h.queries, []);
-  assert.equal(h.sent.length, 1);
-  assert.match(h.sent[0].description, /Alpha.*ONLINE.*1\\/10 players/);
-});
-
-test("Core catalog is published even when no local GameDig servers are configured", async (t) => {
-  const h = harness(t, [server]);
-  await h.start();
-  assert.equal(h.sent.length, 1);
-  assert.match(h.sent[0].description, /Alpha.*ONLINE/);
-});
+NÂˆ\ÜÙ\™\]X[
+œÙ[›[™İJNÂˆ\ÜÙ\›X]Ú
+œÙ[ÌK™\ØÜš\[Û‹Ğ[KŠ“Ó“S‘KÊNÂŸJNÂ
