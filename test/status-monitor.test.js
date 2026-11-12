@@ -1,26 +1,33 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-function harness(t, initialResults) {
+function harness(t, initialResults, { coreApiUrl = 'https://core.example.test', gameServers = [] } = {}) {
   let results = initialResults;
   let cycle;
   let failure;
   let available = true;
   const sent = [];
+  const queries = [];
   const configPath = require.resolve('../src/config');
   const corePath = require.resolve('../src/services/coreApi');
   const monitorPath = require.resolve('../src/features/statusMonitor');
-  const originals = [configPath, corePath, monitorPath].map((path) => require.cache[path]);
+  const queryPath = require.resolve('../src/features/serverQuery');
+  const paths = [configPath, corePath, monitorPath, queryPath];
+  const originals = paths.map((path) => require.cache[path]);
   require.cache[configPath] = { exports: {
-    coreApiUrl: 'https://core.example.test',
-    channels: { serverStatus: 'status' }, colors: { primary: 1 }, gameServers: []
+    coreApiUrl,
+    channels: { serverStatus: 'status' }, colors: { primary: 1 }, gameServers
   } };
-  require.cache[corePath] = { exports: { createCoreApiClient: () => ({
+  require.cache[corePath] = { exports: { createCoreApiClient: ({ baseUrl }) => baseUrl ? ({
     getServers: async () => {
       if (failure) throw failure;
       return results;
     }
-  }) } };
+  }) : null } };
+  require.cache[queryPath] = { exports: { queryServer: async (cfg) => {
+    queries.push(cfg);
+    return { ...cfg, online: false };
+  } } };
   delete require.cache[monitorPath];
   t.mock.method(global, 'setInterval', (callback, delay) => {
     assert.equal(delay, 120000);
@@ -29,20 +36,19 @@ function harness(t, initialResults) {
   t.mock.method(console, 'error', () => {});
   t.mock.method(console, 'warn', () => {});
   const channel = { send: async (message) => {
-    if (failure) throw failure;
     // Serialize through the real Discord builder, including its validation.
     sent.push(message.embeds[0].toJSON());
   } };
   const client = { channels: { cache: { get: () => available ? channel : undefined } } };
   t.after(() => {
-    [configPath, corePath, monitorPath].forEach((path, i) => {
+    paths.forEach((path, i) => {
       if (originals[i]) require.cache[path] = originals[i];
       else delete require.cache[path];
     });
   });
   return {
     start: () => require(monitorPath).monitorLoop(client),
-    tick: () => cycle(), sent, channel,
+    tick: () => cycle(), sent, channel, queries,
     results: (value) => { results = value; },
     fail: (value) => { failure = value; },
     available: (value) => { available = value; }
@@ -97,11 +103,41 @@ test('a missing channel does not suppress later publication', async (t) => {
   assert.equal(h.sent.length, 1);
 });
 
-test('Core failure falls back and the recurring cycle recovers', async (t) => {
-  const h = harness(t, [server]);
-  h.fail(new Error('Core unavailable'));
+const localServers = [
+  { name: 'Local Alpha', type: '7d2d', host: 'alpha.example.test', port: 26900 },
+  { name: 'Local Beta', type: 'ark', host: 'beta.example.test', port: 27015 }
+];
+
+for (const scenario of ['unset URL', 'empty catalog', 'Core failure']) {
+  test(`${scenario} queries and publishes configured GameDig servers`, async (t) => {
+    const h = harness(t, scenario === 'empty catalog' ? [] : [server], {
+      coreApiUrl: scenario === 'unset URL' ? '' : 'https://core.example.test',
+      gameServers: localServers
+    });
+    if (scenario === 'Core failure') h.fail(new Error('Core unavailable'));
+    await h.start();
+    assert.deepEqual(h.queries, localServers);
+    assert.equal(h.sent.length, 1);
+    assert.equal(h.sent[0].description,
+      ':red_circle: **Local Alpha** - OFFLINE\n:red_circle: **Local Beta** - OFFLINE');
+
+    if (scenario !== 'unset URL') {
+      h.fail(null);
+      h.results([server]);
+      await h.tick();
+      assert.deepEqual(h.queries, localServers);
+      assert.equal(h.sent.length, 2);
+      assert.match(h.sent[1].description, /Alpha.*ONLINE.*1\/10 players/);
+      await h.tick();
+      assert.equal(h.sent.length, 2);
+    }
+  });
+}
+
+test('a nonempty Core catalog takes precedence over configured GameDig servers', async (t) => {
+  const h = harness(t, [server], { gameServers: localServers });
   await h.start();
-  h.fail(null);
-  await h.tick();
+  assert.deepEqual(h.queries, []);
   assert.equal(h.sent.length, 1);
+  assert.match(h.sent[0].description, /Alpha.*ONLINE.*1\/10 players/);
 });
