@@ -25,8 +25,6 @@ async function check(client) {
     .sort()
     .join("|");
   if (state.has(key)) return;
-  state.clear();
-  state.set(key, true);
 
   const channel = client.channels.cache.get(config.channels.serverStatus);
   if (!channel) return;
@@ -36,12 +34,35 @@ async function check(client) {
       ? `:large_blue_circle: **${server.name}**${game} - ONLINE - ${server.players}/${server.maxPlayers} players${server.map ? ` - ${server.map}` : ""}`
       : `:red_circle: **${server.name}**${game} - OFFLINE`;
   });
-  const embed = new EmbedBuilder()
-    .setColor(config.colors.primary)
-    .setTitle("SERVER STATUS UPDATE")
-    .setDescription(lines.join("\n"))
-    .setTimestamp();
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  const descriptions = [];
+  let remaining = lines.join("\n");
+  while (remaining.length > 4096) {
+    let end = remaining.lastIndexOf("\n", 4096);
+    const atNewline = end > 0;
+    if (!atNewline) {
+      end = 4096;
+      // Keep UTF-16 surrogate pairs together when a single line is too long.
+      if (/[\uD800-\uDBFF]/.test(remaining[end - 1])) end--;
+    }
+    descriptions.push(remaining.slice(0, end));
+    remaining = remaining.slice(end + (atNewline ? 1 : 0));
+  }
+  if (remaining) descriptions.push(remaining);
+
+  try {
+    for (const description of descriptions) {
+      const embed = new EmbedBuilder()
+        .setColor(config.colors.primary)
+        .setTitle("SERVER STATUS UPDATE")
+        .setDescription(description)
+        .setTimestamp();
+      await channel.send({ embeds: [embed] });
+    }
+    state.clear();
+    state.set(key, true);
+  } catch {
+    // Leave the update pending so the next poll retries failed delivery.
+  }
 }
 
 async function monitorLoop(client) {
