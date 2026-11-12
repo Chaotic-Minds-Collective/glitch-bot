@@ -67,3 +67,17 @@ test("Core health check does not require a service credential and fails non-fata
   });
   assert.deepEqual(await client.checkHealth(), { configured: true, available: true });
 });
+
+test("Core request cannot override its service bearer credential", async () => {
+  let observedHeaders;
+  const client = createCoreApiClient({
+    baseUrl: "https://core.example.test",
+    serviceToken: "trusted-token",
+    fetchImpl: async (_url, options) => {
+      observedHeaders = options.headers;
+      return new Response(null, { status: 204 });
+    },
+  });
+  await client.request("/private", { headers: { Authorization: "Bearer attacker-token" } });
+  assert.equal(observedHeaders.Authorization, "Bearer trusted-token");
+});

@@ -6,10 +6,6 @@ const vm = require('node:vm');
 
 const configSource = fs.readFileSync(path.join(__dirname, '../src/config.js'), 'utf8');
 
-/**
- * Load the configuration module with isolated environment variables.
- * dotenv is stubbed because each test supplies its environment directly.
- */
 function loadConfig(overrides = {}) {
   const module = { exports: {} };
   const env = {
@@ -24,6 +20,7 @@ function loadConfig(overrides = {}) {
     module,
     process: { env },
     console: { warn() {} },
+    URL,
     require(id) {
       if (id === 'dotenv') return { config() {} };
       throw new Error(`Unexpected module dependency: ${id}`);
@@ -143,7 +140,6 @@ test('Core API service token requires a configured base URL', () => {
   );
 });
 
-
 test('GAME_SERVERS accepts a valid Core server UUID mapping', () => {
   const config = loadConfig({
     GAME_SERVERS: JSON.stringify([
@@ -170,4 +166,3 @@ test('GAME_SERVERS rejects invalid Core server UUID mappings', () => {
     /coreServerId must be a valid UUID/,
   );
 });
-

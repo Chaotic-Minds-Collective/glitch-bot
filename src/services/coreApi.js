@@ -52,9 +52,9 @@ function createCoreApiClient({
         method,
         headers: {
           Accept: "application/json",
+          ...headers,
           Authorization: `Bearer ${token}`,
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-          ...headers,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
