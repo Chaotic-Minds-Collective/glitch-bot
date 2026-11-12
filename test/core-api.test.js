@@ -59,3 +59,27 @@ test("Core API URL rejects unsupported protocols", () => {
     baseUrl: "file:///tmp/core", serviceToken: "test-token",
   }), /HTTP or HTTPS/);
 });
+
+test("Core catalog GET works without a token and strips caller credentials", async () => {
+  const client = createCoreApiClient({
+    baseUrl: "https://core.example.test", serviceToken: "",
+    fetchImpl: async (_url, options) => {
+      assert.equal(new Headers(options.headers).has("authorization"), false);
+      return jsonResponse({ data: [] });
+    },
+  });
+  assert.deepEqual(await client.getServers(), []);
+  await client.request("/servers", { headers: { AUTHORIZATION: "Bearer caller" } });
+});
+
+test("Core catalog rejects invalid identity and status rather than inventing offline status", async () => {
+  const valid = { id: "one", name: "Alpha", online: false };
+  for (const entry of [null, {}, { ...valid, online: undefined }, { ...valid, online: "false" },
+    { ...valid, id: "" }, { ...valid, name: 1 }]) {
+    const client = createCoreApiClient({
+      baseUrl: "https://core.example.test", serviceToken: "",
+      fetchImpl: async () => jsonResponse({ data: [valid, entry] }),
+    });
+    await assert.rejects(client.getServers(), { code: "INVALID_SERVER_CATALOG" });
+  }
+});

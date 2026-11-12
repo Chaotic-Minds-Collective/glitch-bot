@@ -33,7 +33,7 @@ function createCoreApiClient({
   }
 
   async function request(path, { method = "GET", body, headers = {} } = {}) {
-    if (!token) {
+    if (!token && method.toUpperCase() !== "GET") {
       throw new CoreApiError("Core API integration is not configured.", { code: "CORE_NOT_CONFIGURED" });
     }
     if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
@@ -49,15 +49,11 @@ function createCoreApiClient({
       response = await fetchImpl(url, {
         method,
         headers: {
-          ...headers,
-          Accept: "application/json",
+          ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) =>
+            !["authorization", "accept", ...(body === undefined ? [] : ["content-type"])].includes(name.toLowerCase()))),
           accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : {
-            "Content-Type": "application/json",
-            "content-type": "application/json",
-          }),
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -91,7 +87,11 @@ function createCoreApiClient({
 
   async function getServers() {
     const payload = await request("/servers");
-    if (!Array.isArray(payload?.data)) {
+    if (!Array.isArray(payload?.data) || !payload.data.every((server) =>
+      server && typeof server === "object"
+      && typeof server.id === "string" && server.id.trim().length > 0
+      && typeof server.name === "string" && server.name.trim().length > 0
+      && typeof server.online === "boolean")) {
       throw new CoreApiError("Core API returned an invalid server catalog.", { code: "INVALID_SERVER_CATALOG" });
     }
     return payload.data.map((server) => ({
@@ -112,7 +112,7 @@ function createCoreApiClient({
     try {
       const response = await fetchImpl(new URL("/health/live", origin), {
         method: "GET",
-        headers: { Accept: "application/json", accept: "application/json" },
+        headers: { accept: "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });
       return { configured: true, available: response.ok };

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-function harness(t, initialResults, { coreApiUrl = "https://core.example.test", gameServers = [], gameDigResults = [] } = {}) {
+function harness(t, initialResults, { coreApiUrl = "https://core.example.test", serviceToken = "test-token", gameServers = [], gameDigResults = [] } = {}) {
   let results = initialResults;
   let cycle;
   let failure;
@@ -15,7 +15,7 @@ function harness(t, initialResults, { coreApiUrl = "https://core.example.test", 
   const paths = [configPath, corePath, monitorPath, queryPath];
   const originals = paths.map((path) => require.cache[path]);
   require.cache[configPath] = { exports: {
-    coreApi: { baseUrl: coreApiUrl, serviceToken: "test-token" },
+    coreApi: { baseUrl: coreApiUrl, serviceToken },
     channels: { serverStatus: "status" }, colors: { primary: 1 }, gameServers,
   } };
   require.cache[corePath] = { exports: { createCoreApiClient: ({ baseUrl }) => baseUrl ? ({
@@ -116,7 +116,7 @@ for (const scenario of ["unset URL", "empty catalog"]) {
     assert.deepEqual(h.queries, localServers);
     assert.equal(h.sent.length, 1);
     assert.equal(h.sent[0].description,
-      ":red_circle: **Local Alpha** - OFFLINE\\n:red_circle: **Local Beta** - OFFLINE");
+      ":red_circle: **Local Alpha** - OFFLINE\n:red_circle: **Local Beta** - OFFLINE");
 
     if (scenario !== "unset URL") {
       h.fail(null);
@@ -169,4 +169,11 @@ test("Core catalog is published even when no local GameDig servers are configure
   await h.start();
   assert.equal(h.sent.length, 1);
   assert.match(h.sent[0].description, /Alpha.*ONLINE/);
+});
+
+ test("URL-only Core configuration publishes the catalog", async (t) => {
+  const h = harness(t, [server], { serviceToken: "", gameServers: localServers });
+  await h.start();
+  assert.equal(h.sent.length, 1);
+  assert.deepEqual(h.queries, []);
 });

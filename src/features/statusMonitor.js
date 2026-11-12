@@ -9,7 +9,7 @@ let lastChangeKey;
 
 function getCoreApiClient() {
   const settings = config.coreApi || {};
-  if (!settings.baseUrl || !settings.serviceToken) return null;
+  if (!settings.baseUrl) return null;
   if (!coreApiClient) {
     coreApiClient = createCoreApiClient({
       baseUrl: settings.baseUrl,
@@ -29,14 +29,12 @@ function warnCore(error) {
 
 async function check(client) {
   let results;
-  let usingCore = false;
   try {
     const api = getCoreApiClient();
     if (api) {
       const catalog = await api.getServers();
       if (catalog.length) {
         results = catalog;
-        usingCore = true;
       }
     }
   } catch (error) {
@@ -57,7 +55,7 @@ async function check(client) {
   const lines = results.map((server) => server.online
     ? `:large_blue_circle: **${String(server.name).slice(0, 256)}** - ONLINE - ${server.players}/${server.maxPlayers} players${server.map ? ` - ${String(server.map).slice(0, 256)}` : ""}`
     : `:red_circle: **${String(server.name).slice(0, 256)}** - OFFLINE`);
-  const text = lines.join("\\n");
+  const text = lines.join("\n");
   const description = text.length > 4096 ? `${text.slice(0, 4093)}...` : text;
   const changeKey = JSON.stringify(results.map((server) => [
     server.id ?? null,
