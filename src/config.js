@@ -11,7 +11,7 @@ function loadGameServers() {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`GAME_SERVERS must contain valid JSON: ${error.message}`);
+    throw new Error(\`GAME_SERVERS must contain valid JSON: \${error.message}\`);
   }
   if (!Array.isArray(parsed)) throw new Error('GAME_SERVERS must be a JSON array.');
   for (const [index, server] of parsed.entries()) {
@@ -21,7 +21,7 @@ function loadGameServers() {
     const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
     if (!server || typeof server !== 'object' || Array.isArray(server)
       || !server.name || !server.type || !server.host || !validPort) {
-      throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and an integer port from 1 to 65535.`);
+      throw new Error(\`GAME_SERVERS entry \${index + 1} must include name, type, host, and an integer port from 1 to 65535.\`);
     }
   }
   return parsed;
