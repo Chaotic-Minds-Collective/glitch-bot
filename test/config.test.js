@@ -99,7 +99,8 @@ test('game server port boundaries 1 and 65535 are accepted', () => {
 
 test('Core API integration is disabled by default', () => {
   const config = loadConfig();
-  assert.deepEqual(config.coreApi, {
+  // Copy VM-created properties into this realm before comparing prototypes.
+  assert.deepEqual({ ...config.coreApi }, {
     baseUrl: null,
     serviceToken: null,
     timeoutMs: 5000,
