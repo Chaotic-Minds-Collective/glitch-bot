@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-function harness(t, initialResults, { coreApiUrl = 'https://core.example.test', gameServers = [] } = {}) {
+function harness(t, initialResults, { coreApiUrl = 'https://core.example.test', gameServers = [], gameDigResults = [] } = {}) {
   let results = initialResults;
   let cycle;
   let failure;
@@ -26,7 +26,7 @@ function harness(t, initialResults, { coreApiUrl = 'https://core.example.test', 
   }) : null } };
   require.cache[queryPath] = { exports: { queryServer: async (cfg) => {
     queries.push(cfg);
-    return { ...cfg, online: false };
+    return gameDigResults.find((result) => result.id === cfg.id || result.name === cfg.name) || { ...cfg, online: false };
   } } };
   delete require.cache[monitorPath];
   t.mock.method(global, 'setInterval', (callback, delay) => {
@@ -108,13 +108,12 @@ const localServers = [
   { name: 'Local Beta', type: 'ark', host: 'beta.example.test', port: 27015 }
 ];
 
-for (const scenario of ['unset URL', 'empty catalog', 'Core failure']) {
+for (const scenario of ['unset URL', 'empty catalog']) {
   test(`${scenario} queries and publishes configured GameDig servers`, async (t) => {
     const h = harness(t, scenario === 'empty catalog' ? [] : [server], {
       coreApiUrl: scenario === 'unset URL' ? '' : 'https://core.example.test',
       gameServers: localServers
     });
-    if (scenario === 'Core failure') h.fail(new Error('Core unavailable'));
     await h.start();
     assert.deepEqual(h.queries, localServers);
     assert.equal(h.sent.length, 1);
@@ -133,6 +132,32 @@ for (const scenario of ['unset URL', 'empty catalog', 'Core failure']) {
     }
   });
 }
+
+
+test('Core failure falls back to GameDig results and the recurring cycle recovers', async (t) => {
+  const gameServer = localServers[0];
+  const gameDigResult = {
+    ...gameServer, id: 'local-alpha', online: true, players: 3, maxPlayers: 20, map: 'The Island'
+  };
+  const h = harness(t, [server], {
+    gameServers: [gameServer],
+    gameDigResults: [gameDigResult]
+  });
+  h.fail(new Error('Core unavailable'));
+  await h.start();
+  assert.deepEqual(h.queries, [gameServer]);
+  assert.equal(h.sent.length, 1);
+  assert.match(h.sent[0].description, /Local Alpha.*ONLINE.*3\/20 players.*The Island/);
+
+  h.fail(null);
+  h.results([server]);
+  await h.tick();
+  assert.deepEqual(h.queries, [gameServer]);
+  assert.equal(h.sent.length, 2);
+  assert.match(h.sent[1].description, /Alpha.*ONLINE.*1\/10 players/);
+  await h.tick();
+  assert.equal(h.sent.length, 2);
+});
 
 test('a nonempty Core catalog takes precedence over configured GameDig servers', async (t) => {
   const h = harness(t, [server], { gameServers: localServers });
