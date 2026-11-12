@@ -23,6 +23,15 @@ function loadGameServers() {
       || !server.name || !server.type || !server.host || !validPort) {
       throw new Error(`GAME_SERVERS entry ${index + 1} must include name, type, host, and an integer port from 1 to 65535.`);
     }
+    if (server.coreServerId !== undefined
+      && (typeof server.coreServerId !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(server.coreServerId))) {
+      throw new Error(`GAME_SERVERS entry ${index + 1} coreServerId must be a valid UUID when provided.`);
+    }
+    if (server.serverVersion !== undefined
+      && (typeof server.serverVersion !== 'string' || !server.serverVersion.trim() || server.serverVersion.length > 100)) {
+      throw new Error(`GAME_SERVERS entry ${index + 1} serverVersion must be a non-empty string of at most 100 characters.`);
+    }
   }
   return parsed;
 }
