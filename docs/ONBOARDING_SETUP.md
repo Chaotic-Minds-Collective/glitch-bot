@@ -10,7 +10,7 @@ Glitch's onboarding sequence is:
 
 ## Rules Accepted role
 
-The **Rules Accepted** role has been created in Chaotic Gaming:
+The **Rules Accepted** role has been created in Chaotic Minds Gaming:
 - Role ID: `1568836462764494990`
 - Permissions: none
 - Mentionable: no
