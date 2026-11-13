@@ -17,30 +17,28 @@ function createCoreApiClient({
 } = {}) {
   const configuredUrl = typeof baseUrl === "string" ? baseUrl.trim() : "";
   const token = typeof serviceToken === "string" ? serviceToken.trim() : "";
-  let origin = null;
+  if (!configuredUrl) return null;
 
-  if (configuredUrl) {
-    try {
-      const parsed = new URL(configuredUrl);
-      const localHttp = parsed.protocol === "http:"
-        && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
-      if (parsed.protocol !== "https:" && !localHttp) {
-        throw new Error("Core API URL must use HTTPS outside loopback development.");
-      }
-      origin = parsed.origin;
-    } catch (error) {
-      throw new CoreApiError(error.message, { code: "INVALID_CORE_API_URL" });
+  let origin;
+  try {
+    const parsed = new URL(configuredUrl);
+    const localHttp = parsed.protocol === "http:"
+      && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+    if (parsed.protocol !== "https:" && !localHttp) {
+      throw new Error("Core API URL must use HTTP or HTTPS outside loopback development.");
     }
+    origin = parsed.origin;
+  } catch (error) {
+    throw new CoreApiError(error.message, { code: "INVALID_CORE_API_URL" });
   }
 
   async function request(path, { method = "GET", body, headers = {} } = {}) {
-    if (!origin || !token) {
+    if (!token && method.toUpperCase() !== "GET") {
       throw new CoreApiError("Core API integration is not configured.", { code: "CORE_NOT_CONFIGURED" });
     }
     if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
       throw new CoreApiError("Core API path must be an absolute local path.", { code: "INVALID_PATH" });
     }
-
     const url = new URL(path, origin);
     if (url.origin !== origin) {
       throw new CoreApiError("Core API path escaped the configured origin.", { code: "INVALID_PATH" });
@@ -51,10 +49,11 @@ function createCoreApiClient({
       response = await fetchImpl(url, {
         method,
         headers: {
-          Accept: "application/json",
-          ...headers,
-          Authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) =>
+            !["authorization", "accept", ...(body === undefined ? [] : ["content-type"])].includes(name.toLowerCase()))),
+          accept: "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -77,7 +76,6 @@ function createCoreApiClient({
         }
       }
     }
-
     if (!response.ok) {
       throw new CoreApiError(payload?.error?.message || `Core API request failed (${response.status}).`, {
         status: response.status,
@@ -87,12 +85,34 @@ function createCoreApiClient({
     return payload;
   }
 
+  async function getServers() {
+    const payload = await request("/servers");
+    if (!Array.isArray(payload?.data) || !payload.data.every((server) =>
+      server && typeof server === "object"
+      && typeof server.id === "string" && server.id.trim().length > 0
+      && typeof server.name === "string" && server.name.trim().length > 0
+      && typeof server.online === "boolean")) {
+      throw new CoreApiError("Core API returned an invalid server catalog.", { code: "INVALID_SERVER_CATALOG" });
+    }
+    return payload.data.map((server) => ({
+      id: server.id,
+      name: server.name,
+      game: server.gameKey,
+      online: server.online === true,
+      players: Number.isFinite(server.playerCount) ? server.playerCount : 0,
+      maxPlayers: Number.isFinite(server.maxPlayers) ? server.maxPlayers : 0,
+      map: server.mapName || null,
+      host: server.publicHostname || null,
+      port: server.gamePort || null,
+      source: "core",
+    }));
+  }
+
   async function checkHealth() {
-    if (!origin) return { configured: false, available: false };
     try {
       const response = await fetchImpl(new URL("/health/live", origin), {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers: { accept: "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });
       return { configured: true, available: response.ok };
@@ -103,6 +123,7 @@ function createCoreApiClient({
 
   return Object.freeze({
     request,
+    getServers,
     checkHealth,
     sendServerHeartbeat(serverId, heartbeat) {
       return request(`/integrations/servers/${encodeURIComponent(serverId)}/heartbeat`, {
