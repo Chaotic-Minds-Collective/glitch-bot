@@ -1,7 +1,7 @@
 {
-  "name": "glitch-bot",
+  "name": "cmg-discord-glitch-bot",
   "version": "1.0.0",
-  "description": "Glitch - the Chaotic Gaming community bot. Community built by gamers, for gamers.",
+  "description": "Glitch - the Chaotic Minds Gaming community bot. Community built by gamers, for gamers.",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
